@@ -176,17 +176,122 @@ def format_tmo_int(val) -> str:
     return f"{int(round(val))}"
 
 
-def calcular_tmo_laborable(inicio: date, fin: date) -> int:
+# ==============================================================================
+# CONFIGURACIÓN DE FERIADOS Y DÍAS NO LABORADOS POR ASESOR (BO)
+# ==============================================================================
+# 1. Lista de Feriados Oficiales (puedes agregar o modificar fechas en formato date o 'YYYY-MM-DD').
+#    Se excluyen automáticamente de los días hábiles para todo el equipo.
+LISTA_FERIADOS = [
+    date(2026, 1, 1),   # Año Nuevo
+    date(2026, 4, 2),   # Jueves Santo
+    date(2026, 4, 3),   # Viernes Santo
+    date(2026, 5, 1),   # Día del Trabajo
+    date(2026, 6, 29),  # San Pedro y San Pablo
+    date(2026, 7, 28),  # Fiestas Patrias
+    date(2026, 7, 29),  # Fiestas Patrias
+    date(2026, 8, 6),   # Batalla de Junín
+    date(2026, 8, 30),  # Santa Rosa de Lima
+    date(2026, 10, 8),  # Combate de Angamos
+    date(2026, 11, 1),  # Todos los Santos
+    date(2026, 12, 8),  # Inmaculada Concepción
+    date(2026, 12, 9),  # Batalla de Ayacucho
+    date(2026, 12, 25), # Navidad
+]
+
+# 2. Días no laborados individuales por cada analista Back Office (BO).
+#    (Vacaciones, descansos médicos, licencias, permisos personales, etc.).
+#    Cada día que caiga dentro del período seleccionado en día hábil (Lun-Sáb no feriado)
+#    se descuenta de la meta de ese BO específico (-460 min/día).
+#    Formato: Diccionario donde la clave es el nombre del BO y el valor es una lista de fechas.
+DIAS_NO_LABORADOS_BO = {
+    # Ejemplos de configuración (añade o edita aquí):
+    # "SOFIA ANGELICA TINEO OBREGON": [date(2026, 10, 5), "2026-10-06"],
+    # "EVELYN CELESTE MENDEZ QUISPILAYA": [date(2026, 10, 2)],
+}
+
+
+def normalizar_fecha(f) -> date:
+    """Convierte cadenas o timestamps a objetos date puros."""
+    if isinstance(f, date) and not isinstance(f, pd.Timestamp):
+        return f
+    return pd.to_datetime(f).date()
+
+
+def obtener_set_feriados() -> set[date]:
+    """Retorna un conjunto de fechas de feriados normalizadas."""
+    return {normalizar_fecha(f) for f in LISTA_FERIADOS}
+
+
+def calcular_dias_laborables_base(inicio: date, fin: date) -> int:
     """
-    Calcula TMO laborable excluyendo únicamente domingos:
-    Lunes a Sábado laborables (weekmask='1111110').
-    Cada día laborable equivale a 460 minutos de TMO objetivo.
+    Calcula los días laborables base (Lunes a Sábado, excluyendo domingos y feriados generales).
     """
     if inicio > fin:
         return 0
     fin_calculo = fin + timedelta(days=1)
-    dias = np.busday_count(inicio, fin_calculo, weekmask='1111110')
-    return int(dias * 460)
+    feriados_str = [normalizar_fecha(f).strftime('%Y-%m-%d') for f in LISTA_FERIADOS]
+    dias = np.busday_count(inicio, fin_calculo, weekmask='1111110', holidays=feriados_str)
+    return int(dias)
+
+
+def obtener_fechas_no_laboradas_asesor(asesor: str) -> list[date]:
+    """
+    Obtiene las fechas no laboradas registradas para un asesor (soporta diccionario o lista).
+    """
+    fechas = []
+    asesor_norm = str(asesor).strip().upper()
+    if isinstance(DIAS_NO_LABORADOS_BO, dict):
+        for nombre, lista in DIAS_NO_LABORADOS_BO.items():
+            if str(nombre).strip().upper() == asesor_norm:
+                fechas.extend([normalizar_fecha(f) for f in lista])
+    elif isinstance(DIAS_NO_LABORADOS_BO, list):
+        for item in DIAS_NO_LABORADOS_BO:
+            if isinstance(item, dict):
+                nom = item.get("asesor") or item.get("bo") or item.get("nombre")
+                f = item.get("fecha") or item.get("dia")
+                if nom and str(nom).strip().upper() == asesor_norm and f:
+                    fechas.append(normalizar_fecha(f))
+    return fechas
+
+
+def calcular_meta_asesor(asesor: str, inicio: date, fin: date, opcion_periodo: str) -> dict:
+    """
+    Calcula los días laborables base del período, descuenta los días no laborados
+    del asesor que caigan en días hábiles (Lun-Sáb no feriado), y obtiene su TMO objetivo.
+    """
+    if inicio > fin:
+        return {"dias_base": 0, "dias_descontados": 0, "dias_efectivos": 0, "tmo_objetivo": 0}
+
+    feriados_set = obtener_set_feriados()
+
+    if opcion_periodo in ["Hoy", "Ayer"]:
+        es_domingo = (inicio.weekday() == 6)
+        es_feriado = (inicio in feriados_set)
+        dias_base = 0 if (es_domingo or es_feriado) else 1
+    else:
+        dias_base = calcular_dias_laborables_base(inicio, fin)
+
+    fechas_no_lab = obtener_fechas_no_laboradas_asesor(asesor)
+    dias_descontados = 0
+    fechas_descontadas = []
+
+    for f in fechas_no_lab:
+        if inicio <= f <= fin:
+            # Solo descontar si era un día laborable (no domingo y no feriado)
+            if f.weekday() != 6 and f not in feriados_set:
+                dias_descontados += 1
+                fechas_descontadas.append(f)
+
+    dias_efectivos = max(0, dias_base - dias_descontados)
+    tmo_objetivo = int(dias_efectivos * 460)
+
+    return {
+        "dias_base": dias_base,
+        "dias_descontados": dias_descontados,
+        "dias_efectivos": dias_efectivos,
+        "tmo_objetivo": tmo_objetivo,
+        "fechas_descontadas": fechas_descontadas
+    }
 
 
 # ==============================================================================
@@ -277,9 +382,13 @@ with st.sidebar:
                 format="DD/MM/YYYY"
             )
         with col_f2:
+            # Calcular fin por defecto: ayer (si está dentro del rango) o inicio si ayer es anterior al rango disponible
+            default_fin = min(max_date_disponible, ayer)
+            if default_fin < default_inicio:
+                default_fin = default_inicio
             fecha_fin = st.date_input(
                 "📅 Fecha Fin",
-                value=max_date_disponible,
+                value=default_fin,
                 min_value=min_date_disponible,
                 max_value=max_date_disponible,
                 format="DD/MM/YYYY"
