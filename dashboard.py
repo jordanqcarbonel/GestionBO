@@ -201,9 +201,11 @@ LISTA_FERIADOS = [
 # 2. Días no laborados individuales por cada analista Back Office (BO).
 #    (Vacaciones, descansos médicos, licencias, permisos personales, etc.).
 #    Cada día que caiga dentro del período seleccionado en día hábil (Lun-Sáb no feriado)
-#    se descuenta de la meta de ese BO específico (-460 min/día).
+#    se descuenta de la meta de ese BO específico (-450 min/día).
 #    Formato: Diccionario donde la clave es el nombre del BO y el valor es una lista de fechas.
 DIAS_NO_LABORADOS_BO = {
+    "EVELYN CELESTE MENDEZ QUISPILAYA": [date(2026, 10, 2)],
+    "BRAYAN ANTONY RIVERA CONDOR": [date(2026, 10, 3), "2026-10-10", "2026-10-19"],
     # Ejemplos de configuración (añade o edita aquí):
     # "SOFIA ANGELICA TINEO OBREGON": [date(2026, 10, 5), "2026-10-06"],
     # "EVELYN CELESTE MENDEZ QUISPILAYA": [date(2026, 10, 2)],
@@ -283,7 +285,7 @@ def calcular_meta_asesor(asesor: str, inicio: date, fin: date, opcion_periodo: s
                 fechas_descontadas.append(f)
 
     dias_efectivos = max(0, dias_base - dias_descontados)
-    tmo_objetivo = int(dias_efectivos * 460)
+    tmo_objetivo = int(dias_efectivos * 450)
 
     return {
         "dias_base": dias_base,
@@ -361,11 +363,11 @@ with st.sidebar:
     if opcion_periodo == "Hoy":
         fecha_inicio = hoy
         fecha_fin = hoy
-        tmo_objetivo = 460
+        tmo_objetivo = 450
     elif opcion_periodo == "Ayer":
         fecha_inicio = ayer
         fecha_fin = ayer
-        tmo_objetivo = 460
+        tmo_objetivo = 450
     else:
         # Inicio del mes actual por defecto
         inicio_mes_actual = hoy.replace(day=1)
@@ -417,7 +419,7 @@ with st.sidebar:
 
     st.markdown("""
         <div style="font-size: 0.74rem; color: #94a3b8; text-align: center; margin-top: 15px;">
-            Días laborables: Lun - Sáb (460 min/día)
+            Días laborables: Lun - Sáb (450 min/día)
         </div>
     """, unsafe_allow_html=True)
 
