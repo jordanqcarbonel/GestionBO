@@ -18,6 +18,21 @@ st.set_page_config(
 )
 
 # ==============================================================================
+# FUNCIÓN DE CÁLCULO DE TMO LABORABLE
+# ==============================================================================
+def calcular_tmo_laborable(inicio: date, fin: date) -> int:
+    """
+    Replica =DIAS.LAB.INTL(inicio, fin, 11) * 450
+    Excluye domingos y feriados definidos en LISTA_FERIADOS.
+    """
+    if inicio > fin:
+        return 0
+    fin_calculo = fin + timedelta(days=1)
+    feriados_str = [normalizar_fecha(f).strftime('%Y-%m-%d') for f in LISTA_FERIADOS]
+    dias = np.busday_count(inicio, fin_calculo, weekmask='1111110', holidays=feriados_str)
+    return int(dias * 450)
+
+# ==============================================================================
 # ESTILOS CSS PERSONALIZADOS (IDENTIDAD CORPORATIVA)
 # ==============================================================================
 # Paleta de Marca: Azul Principal #005cff | Azul Secundario #118DFF
