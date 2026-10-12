@@ -229,7 +229,7 @@ def calcular_tmo_laborable(inicio: date, fin: date) -> int:
 # ==============================================================================
 # CARGA DE DATOS
 # ==============================================================================
-@st.cache_data(show_spinner=False)
+@st.cache_data(ttl=0)
 def cargar_datos():
     try:
         df = pd.read_csv(RUTA_CONSOLIDADO)
