@@ -1,0 +1,172 @@
+import pandas as pd
+
+# Matriz de TMO
+TMO_MATRIX = {
+    'CONTACTO VALIDO': 8,
+    'CONTACTO NO VALIDO': 4,
+    'ENTREGADO': 1,
+    'REINGRESO': 2,
+    'NO CORRESPONDE': 2,
+    'CAIDAS EXPRESS': 10,
+    'CAIDAS PROGRAMADO': 10,
+    'CAIDAS PICKUP': 10,
+    'DERIVACIÓN PICK UP': 10,
+    'PLAZO OFRECIDO': 10,
+    'ALERTAS': 10,
+    'BASE QUANTIA': 3,
+    'SUBSANACIONES': 1,
+    'REASIGNACIONES': 2,
+    'TRIAGE': 10,
+    'EXPORTADO STOCK- OL': 10,
+    'REINGRESO - VENTA MES ANTERIOR': 10,
+    'SIMULACIÓN INGRESO': 10,
+    'REPRO': 3,
+    'ALERTA ACTIVACIÓN - REA': 3,
+    'STATUS DE ORDEN': 5,
+    'CONSULTA A TIENDA': 5,
+    'HUELLA': 5,
+    'CANCELACION': 5
+}
+
+def estandarizar_y_unir(df, mapeo_columnas, nombre_hoja, categoria_origen):
+    """
+    Toma un DataFrame, extrae bloques de columnas específicos, los renombra al estándar
+    y los apila verticalmente ignorando los nulos.
+    """
+    bloques = []
+    
+    for bloque in mapeo_columnas:
+        # Extraer solo las columnas que existen en el DataFrame
+        cols_existentes = {k: v for k, v in bloque.items() if k in df.columns}
+        
+        if not cols_existentes:
+            continue
+            
+        df_bloque = df[list(cols_existentes.keys())].copy()
+        df_bloque.rename(columns=cols_existentes, inplace=True)
+        
+        # Añadir metadatos de origen
+        df_bloque['Hoja_Origen'] = nombre_hoja
+        df_bloque['Categoria_Calculo'] = categoria_origen
+        
+        # Si no hay 'Tipo_Gestión' en este bloque (ej. Quantia), lo rellenamos con la categoría
+        if 'Tipo_Gestión' not in df_bloque.columns:
+            df_bloque['Tipo_Gestión'] = categoria_origen
+            
+        bloques.append(df_bloque)
+        
+    if bloques:
+        df_unido = pd.concat(bloques, ignore_index=True)
+        # 🔒 FILTRADO ESTRICTO DE NULOS:
+        # Una gestión es válida solo si tiene Reprogramador, Fecha de Gestión Y Tipo de Gestión.
+        # Si cualquiera de estos tres campos es nulo/vacío, se descarta.
+        columnas_a_validar = [c for c in ['Fecha_Gestión', 'Reprogramador', 'Tipo_Gestión'] if c in df_unido.columns]
+        df_unido = df_unido.dropna(subset=columnas_a_validar)
+        return df_unido
+    else:
+        return pd.DataFrame()
+
+def transformar_datos(dict_repro, dict_quantia):
+    print("⚙️ Iniciando transformación y cálculo de TMO...")
+    datos_procesados = []
+
+    # 1. PROCESAR HOJAS: APP, DIG, REPRO TLV
+    hojas_grupo_1 = ['APP', 'DIG', 'REPRO TLV']
+    for hoja in hojas_grupo_1:
+        if hoja in dict_repro:
+            df = dict_repro[hoja]
+            
+            # Bloque de Gestiones Regulares (1, 2 y 3)
+            mapeo_gestiones = [
+                {'FECHA DE GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 1': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión'},
+                {'FECHA DE GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 2': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión'},
+                {'FECHA DE GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 3': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión'}
+            ]
+            df_gestiones = estandarizar_y_unir(df, mapeo_gestiones, hoja, 'GESTIÓN REGULAR')
+            
+            # Bloque de Análisis 1
+            mapeo_analisis_1 = [
+                {'FECHA ANÁLISIS 1': 'Fecha_Gestión', 'REPRO ANÁLISIS 1': 'Reprogramador', 'TIPO DE ANALISIS 1': 'Tipo_Gestión'}
+            ]
+            df_analisis_1 = estandarizar_y_unir(df, mapeo_analisis_1, hoja, 'GESTIÓN ANÁLISIS')
+            
+            # Bloque de Análisis Caídas
+            mapeo_caidas = [
+                {'FECHA ANALISIS CAIDAS': 'Fecha_Gestión', 'REPRO ANÁLISIS CAIDAS': 'Reprogramador', 'ANALISIS VENTAS CAIDAS': 'Tipo_Gestión'}
+            ]
+            df_caidas = estandarizar_y_unir(df, mapeo_caidas, hoja, 'GESTIÓN ANÁLISIS')
+            
+            datos_procesados.extend([df_gestiones, df_analisis_1, df_caidas])
+
+    # 2. PROCESAR HOJA: CAIDAS
+    if 'CAIDAS' in dict_repro:
+        df = dict_repro['CAIDAS']
+        # Como solo hay un reprogramador, lo asignamos a los 3 mapeos
+        mapeo_caidas_unica = [
+            {'FECHA GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión'},
+            {'FECHA GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión'},
+            {'FECHA GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión'}
+        ]
+        df_caidas_unica = estandarizar_y_unir(df, mapeo_caidas_unica, 'CAIDAS', 'GESTIÓN REGULAR')
+        datos_procesados.append(df_caidas_unica)
+
+    # 2.1 PROCESAR HOJA: ALERTAS
+    if 'ALERTAS' in dict_repro:
+        df_alertas = estandarizar_y_unir(
+            dict_repro['ALERTAS'],
+            [{'FECHA DE GESTIÓN': 'Fecha_Gestión', 'NOMBRE BO': 'Reprogramador', 'TIPO DE ALERTA': 'Tipo_Gestión'}],
+            'ALERTAS', 'ALERTAS'
+        )
+        datos_procesados.append(df_alertas)
+
+    # 2.2 PROCESAR HOJA: REASIGNACIONES
+    if 'REASIGNACIONES' in dict_repro:
+        df_reasig = estandarizar_y_unir(
+            dict_repro['REASIGNACIONES'],
+            [{'FECHA GESTION 1': 'Fecha_Gestión', 'REPRO REA 1': 'Reprogramador'}],
+            'REASIGNACIONES', 'REASIGNACIONES'
+        )
+        datos_procesados.append(df_reasig)
+
+    # 3. PROCESAR QUANTIA - SUBSANACIONES
+    # Hojas específicas con lógica de "OBSERVACIONES"
+    hojas_subsanaciones = ['SUB-REINCIDENTES', 'SUBSANACIONES']
+    for hoja in hojas_subsanaciones:
+        if hoja in dict_quantia:
+            df_sub = dict_quantia[hoja].copy()
+            # Filtrar filas donde 'OBSERVACIONES' no esté vacía ni nula
+            if 'OBSERVACIONES' in df_sub.columns:
+                df_sub = df_sub.dropna(subset=['OBSERVACIONES'])
+                df_sub = df_sub[df_sub['OBSERVACIONES'].astype(str).str.strip() != '']
+            
+            df_procesado = estandarizar_y_unir(
+                df_sub,
+                [{'FECHA': 'Fecha_Gestión', 'REPRO': 'Reprogramador'}],
+                hoja, 'SUBSANACIONES' # Fuerza que el Tipo_Gestión sea SUBSANACIONES
+            )
+            datos_procesados.append(df_procesado)
+
+    # Resto de hojas de Quantia (asumiendo que tienen la estructura BO 1, BO 2, etc.)
+    for hoja, df in dict_quantia.items():
+        if hoja not in hojas_subsanaciones:
+            mapeo_quantia = [
+                {'FECHA GESTION BO 1': 'Fecha_Gestión', 'BO ASIGNADO 1': 'Reprogramador'},
+                {'FECHA GESTION BO 2': 'Fecha_Gestión', 'BO ASIGNADO 2': 'Reprogramador'},
+                {'FECHA GESTION BO 3': 'Fecha_Gestión', 'BO ASIGNADO 3': 'Reprogramador'},
+                {'FECHA GESTION BO 4': 'Fecha_Gestión', 'BO ASIGNADO 4': 'Reprogramador'}
+            ]
+            df_quantia = estandarizar_y_unir(df, mapeo_quantia, hoja, hoja.upper())
+            datos_procesados.append(df_quantia)
+
+    # 4. CONSOLIDAR TODO
+    df_final = pd.concat(datos_procesados, ignore_index=True)
+    
+    # Limpieza final: asegurar que Tipo_Gestión esté en mayúsculas y sin espacios extra para el cruce
+    df_final['Tipo_Gestión'] = df_final['Tipo_Gestión'].astype(str).str.strip().str.upper()
+    
+    # 5. CRUZAR TMO
+    # Si el Tipo_Gestión no está en la matriz, asigna 0 por defecto.
+    df_final['TMO_Asignado'] = df_final['Tipo_Gestión'].map(TMO_MATRIX).fillna(0)
+
+    print(f"✅ Transformación completa. Se consolidaron {len(df_final)} gestiones válidas.")
+    return df_final
