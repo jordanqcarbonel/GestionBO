@@ -479,11 +479,21 @@ df_resumen.columns = ['BACK OFFICE', 'TOTAL_TMO']
 # Asegurar enteros estrictos en TMO
 df_resumen['TOTAL_TMO'] = df_resumen['TOTAL_TMO'].round().astype(int)
 
-# Cálculo de cumplimiento
-if tmo_objetivo > 0:
-    df_resumen['CUMPLIMIENTO'] = df_resumen['TOTAL_TMO'] / tmo_objetivo
-else:
-    df_resumen['CUMPLIMIENTO'] = 0.0
+# Cálculo de cumplimiento individualizado por asesor (aplicando días no laborados)
+metas_individuales = []
+for idx, row in df_resumen.iterrows():
+    asesor_nombre = row['BACK OFFICE']
+    # Calcula la meta específica del asesor usando su lista de días no laborados
+    res_meta = calcular_meta_asesor(asesor_nombre, fecha_inicio, fecha_fin, opcion_periodo)
+    metas_individuales.append(res_meta['tmo_objetivo'])
+
+df_resumen['TMO_OBJETIVO_INDIVIDUAL'] = metas_individuales
+
+# Evitar división por cero si la meta individual es 0
+df_resumen['CUMPLIMIENTO'] = df_resumen.apply(
+    lambda r: r['TOTAL_TMO'] / r['TMO_OBJETIVO_INDIVIDUAL'] if r['TMO_OBJETIVO_INDIVIDUAL'] > 0 else 0.0,
+    axis=1
+)
 
 # Ordenar de mayor a menor cumplimiento
 df_resumen = df_resumen.sort_values(by='CUMPLIMIENTO', ascending=False).reset_index(drop=True)
