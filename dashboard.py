@@ -936,7 +936,7 @@ with col_main:
 
                     # 👈 Borra la columna numérica para que solo quede 'Sin Cloud Visual'
                     df_resumen_cloud.drop(columns=["Sin Cloud"], inplace=True)
-                    
+
                     st.markdown("#### 📋 Resumen por Tipo de Contacto")
                     
                     # El foco visual va hacia % Desvío con ProgressColumn
@@ -957,7 +957,7 @@ with col_main:
                             "Sin Cloud Visual": st.column_config.TextColumn(
                                 "❌ Sin Cloud",
                                 help="Cantidad de llamadas tipificadas que no figuran en Genesys Cloud",
-                                width="medium"
+                                width="small"
                             ),
                             "C. Válido (%)": st.column_config.NumberColumn(
                                 "C. Válido (%)",
