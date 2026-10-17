@@ -919,17 +919,17 @@ with col_main:
                         "% Desvío": error_global
                     })
 
-                df_resumen = pd.DataFrame(resumen_bo)
+                df_resumen_cloud = pd.DataFrame(resumen_bo)
 
-                if not df_resumen.empty:
+                if not df_resumen_cloud.empty:
                     # Ordenar priorizando a quienes presentan mayor volumen y tasa de error
-                    df_resumen = df_resumen.sort_values(by=["Sin Cloud", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
+                    df_resumen_cloud = df_resumen_cloud.sort_values(by=["Sin Cloud", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
 
                     st.markdown("#### 📋 Matriz de Desvíos por Back Office")
                     
                     # El foco visual va hacia % Desvío con ProgressColumn
                     st.dataframe(
-                        df_resumen,
+                        df_resumen_cloud,
                         use_container_width=True,
                         hide_index=True,
                         column_config={
@@ -967,7 +967,7 @@ with col_main:
                                 help="Tasa de incumplimiento telefónico (foco de auditoría)",
                                 format="%.2f%%",
                                 min_value=0.0,
-                                max_value=max(float(df_resumen["% Desvío"].max() or 5.0), 5.0)  # Escala inteligente al desvío real
+                                max_value=max(float(df_resumen_cloud["% Desvío"].max() or 5.0), 5.0)  # Escala inteligente al desvío real
                             )
                         }
                     )
