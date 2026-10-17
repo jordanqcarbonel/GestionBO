@@ -818,9 +818,9 @@ with col_main:
         st.markdown(
             """
             <div style="margin-bottom: 12px;">
-                <h3 style="margin: 0; color: #005cff; font-weight: 700;">☁️ Auditoría Telefónica: Cruce Genesys Cloud</h3>
+                <h3 style="margin: 0; color: #005cff; font-weight: 700;">☁️ GESTIÓN REPRO - CAIDAS: Cruce Genesys Cloud</h3>
                 <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.85rem;">
-                    Auditoría de asertividad entre gestión declarada en Excel vs llamadas reales en Genesys.
+                    Auditoría entre gestión tipificada en el drive vs llamadas reales en Genesys.
                 </p>
             </div>
             """,
@@ -855,7 +855,7 @@ with col_main:
                 
                 with col_k1:
                     st.metric(
-                        label="Total Auditadas",
+                        label="Total Gestiones",
                         value=f"{total_gestiones:,}".replace(",", ".")
                     )
                 with col_k2:
@@ -874,7 +874,7 @@ with col_main:
                 with col_k4:
                     status_text = "🟢 ÓPTIMO" if tasa_global_asertividad >= 98.0 else ("🟡 ALERTA" if tasa_global_asertividad >= 95.0 else "🔴 CRÍTICO")
                     st.metric(
-                        label="Estado de Calidad",
+                        label="Estado",
                         value=status_text
                     )
 
@@ -925,7 +925,7 @@ with col_main:
                     # Ordenar priorizando a quienes presentan mayor volumen y tasa de error
                     df_resumen_cloud = df_resumen_cloud.sort_values(by=["Sin Cloud", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
 
-                    st.markdown("#### 📋 Matriz de Desvíos por Back Office")
+                    st.markdown("#### 📋 Resumen por Tipo de Contacto")
                     
                     # El foco visual va hacia % Desvío con ProgressColumn
                     st.dataframe(
@@ -934,37 +934,37 @@ with col_main:
                         hide_index=True,
                         column_config={
                             "Back Office": st.column_config.TextColumn(
-                                "BO / Ejecutivo",
-                                help="Nombre del personal de Back Office evaluado",
+                                "Back Office",
+                                help="Nombre de Back Office evaluado",
                                 width="medium"
                             ),
-                            "Total Base": st.column_config.NumberColumn(
-                                "Total Base",
+                            "Total Gestiones": st.column_config.NumberColumn(
+                                "Total Gestiones",
                                 format="%d"
                             ),
                             "Sin Cloud": st.column_config.NumberColumn(
                                 "❌ Sin Cloud",
-                                help="Cantidad de llamadas declaradas que no figuran en Genesys",
+                                help="Cantidad de llamadas tipificadas que no figuran en Genesys Cloud",
                                 format="%d"
                             ),
-                            "Asert. Válido (%)": st.column_config.NumberColumn(
-                                "Asert. Válido (%)",
-                                help="% de llamadas 'Contacto Válido' validadas en Genesys",
+                            "C. Válido (%)": st.column_config.NumberColumn(
+                                "C. Válido (%)",
+                                help="% de llamadas 'Contacto Válido' validadas en Genesys Cloud",
                                 format="%.1f%%"
                             ),
-                            "Asert. No Válido (%)": st.column_config.NumberColumn(
-                                "Asert. No Válido (%)",
-                                help="% de llamadas 'Contacto No Válido' validadas en Genesys",
+                            "C. No Válido (%)": st.column_config.NumberColumn(
+                                "C. No Válido (%)",
+                                help="% de llamadas 'Contacto No Válido' validadas en Genesys Cloud",
                                 format="%.1f%%"
                             ),
                             "Cumplimiento Global (%)": st.column_config.NumberColumn(
                                 "Cumplimiento (%)",
-                                help="Tasa global de efectividad telefónica",
+                                help="Tasa global de gestión efectiva",
                                 format="%.1f%%"
                             ),
                             "% Desvío": st.column_config.ProgressColumn(
                                 "Error (%)",
-                                help="Tasa de incumplimiento telefónico (foco de auditoría)",
+                                help="Tasa de incumplimiento telefónico / error tipificación",
                                 format="%.2f%%",
                                 min_value=0.0,
                                 max_value=max(float(df_resumen_cloud["% Desvío"].max() or 5.0), 5.0)  # Escala inteligente al desvío real
