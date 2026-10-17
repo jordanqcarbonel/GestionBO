@@ -845,7 +845,7 @@ with col_main:
                 total_gestiones = len(df_cloud)
                 total_con_cloud = (df_cloud['Validación_Genesys'] == 'Sí').sum()
                 total_sin_cloud = (df_cloud['Validación_Genesys'] == 'No').sum()
-                tasa_global_asertividad = (total_con_cloud / total_gestiones) * 100 if total_gestiones > 0 else 0.0
+                tasa_global_efectividad = (total_con_cloud / total_gestiones) * 100 if total_gestiones > 0 else 0.0
                 tasa_global_error = (total_sin_cloud / total_gestiones) * 100 if total_gestiones > 0 else 0.0
 
                 # --------------------------------------------------------------
@@ -862,7 +862,7 @@ with col_main:
                     st.metric(
                         label="Llamadas Validadas",
                         value=f"{total_con_cloud:,}".replace(",", "."),
-                        delta=f"{tasa_global_asertividad:.1f}% Asertividad"
+                        delta=f"{tasa_global_efectividad:.0f}%"
                     )
                 with col_k3:
                     st.metric(
@@ -950,12 +950,12 @@ with col_main:
                             "C. Válido (%)": st.column_config.NumberColumn(
                                 "C. Válido (%)",
                                 help="% de llamadas 'Contacto Válido' validadas en Genesys Cloud",
-                                format="%.1f%%"
+                                format="%.0f%%"
                             ),
                             "C. No Válido (%)": st.column_config.NumberColumn(
                                 "C. No Válido (%)",
                                 help="% de llamadas 'Contacto No Válido' validadas en Genesys Cloud",
-                                format="%.1f%%"
+                                format="%.0f%%"
                             ),
                             "Cumplimiento Global (%)": st.column_config.NumberColumn(
                                 "Cumplimiento (%)",
