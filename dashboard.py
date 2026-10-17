@@ -913,8 +913,8 @@ with col_main:
                         "Back Office": agente,
                         "Total Base": n_tot,
                         "Sin Cloud": sin_cloud_a,
-                        "Asert. Válido (%)": asert_val,
-                        "Asert. No Válido (%)": asert_noval,
+                        "C. Válido (%)": asert_val,
+                        "C. No Válido (%)": asert_noval,
                         "Cumplimiento Global (%)": asert_global,
                         "% Desvío": error_global
                     })
