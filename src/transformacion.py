@@ -192,8 +192,12 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys):
 
     # --- CRUCE CON GENESYS ---
     if 'Telefono' in df_final.columns:
-        # Limpiar el teléfono de Excel (quitar '.0' si se leyó como decimal y extraer últimos 9)
-        df_final['Telefono'] = df_final['Telefono'].astype(str).str.replace(r'\D', '', regex=True).str[-9:]
+        # 1. Convertir a texto
+        df_final['Telefono'] = df_final['Telefono'].astype(str)
+        # 2. Eliminar el ".0" invisible que Pandas añade a los números enteros
+        df_final['Telefono'] = df_final['Telefono'].str.replace(r'\.0$', '', regex=True)
+        # 3. Quitar guiones/espacios y extraer los últimos 9 dígitos
+        df_final['Telefono'] = df_final['Telefono'].str.replace(r'\D', '', regex=True).str[-9:]
         
         # Unir por Teléfono Y Reprogramador
         df_final = df_final.merge(
