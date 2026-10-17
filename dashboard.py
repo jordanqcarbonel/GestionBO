@@ -32,6 +32,13 @@ def calcular_tmo_laborable(inicio: date, fin: date) -> int:
     dias = np.busday_count(inicio, fin_calculo, weekmask='1111110', holidays=feriados_str)
     return int(dias * 450)
 
+def agregar_alerta_sin_cloud(val):
+    if pd.isna(val) or val == 0:
+        return "✅ 0"
+    elif val >= 10:
+        return f"🚨 {int(val)}"  # Alerta roja para 10 o más
+    else:
+        return f"⚠️ {int(val)}"  # Alerta amarilla entre 1 y 9
 # ==============================================================================
 # ESTILOS CSS PERSONALIZADOS (IDENTIDAD CORPORATIVA)
 # ==============================================================================
@@ -942,13 +949,11 @@ with col_main:
                                 "Total Gestiones",
                                 format="%d"
                             ),
-                            "Sin Cloud": st.column_config.ProgressColumn(
+                            "Sin Cloud Visual": st.column_config.TextColumn(
                                 "❌ Sin Cloud",
                                 help="Cantidad de llamadas tipificadas que no figuran en Genesys Cloud",
-                                format="%d",
-                                min_value=0,
-                                max_value=int(df_resumen_cloud["Sin Cloud"].max()) if not df_resumen_cloud.empty else 20
-),
+                                width="medium"
+                            ),
                             "C. Válido (%)": st.column_config.NumberColumn(
                                 "C. Válido (%)",
                                 help="% de llamadas 'Contacto Válido' validadas en Genesys Cloud",
