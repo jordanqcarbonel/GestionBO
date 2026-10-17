@@ -1,4 +1,4 @@
-from config.settings import RUTA_REPRO, RUTA_QUANTIA, RUTA_CONSOLIDADO, RUTA_GENESYS
+from config.settings import RUTA_REPRO, RUTA_QUANTIA, RUTA_CONSOLIDADO, RUTA_GENESYS, RUTA_REPORTE_BO
 from src.extraccion import extraer_datos
 from src.transformacion import transformar_datos
 
@@ -9,10 +9,10 @@ def ejecutar_pipeline():
         print("✅ Archivos base encontrados con éxito.\n")
         
         # --- FASE 1: EXTRACCIÓN ---
-        dict_repro, dict_quantia, df_genesys = extraer_datos(RUTA_REPRO, RUTA_QUANTIA, RUTA_GENESYS)
+        dict_repro, dict_quantia, df_genesys, df_reporte_bo = extraer_datos(RUTA_REPRO, RUTA_QUANTIA, RUTA_GENESYS, RUTA_REPORTE_BO)
         
         # --- FASE 2: TRANSFORMACIÓN ---
-        df_consolidado = transformar_datos(dict_repro, dict_quantia, df_genesys)
+        df_consolidado = transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo)
 
         # --- FASE 3: EXPORTACIÓN PARA DASHBOARD ---
         df_consolidado.to_csv(RUTA_CONSOLIDADO, index=False, encoding='utf-8')

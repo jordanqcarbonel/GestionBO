@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 RUTA_REPRO = Path(r"C:\Users\vorte\scc.com.pe\Karen Flores - BO\GESTION REPRO - ENTEL PERU.xlsx")
 RUTA_QUANTIA = Path(r"C:\Users\vorte\scc.com.pe\Karen Flores - BO\QUANTIA - SUBSANACIONES.xlsx")
 RUTA_GENESYS = Path(r"G:\GestiónBO\genesys")
+RUTA_REPORTE_BO = Path(r"G:\Reporte Automatizado\output\ReporteBO.csv")
 
 # Directorio de salida para el CSV procesado que leerá Streamlit
 CARPETA_SALIDA = BASE_DIR / "output"

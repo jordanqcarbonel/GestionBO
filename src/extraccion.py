@@ -3,7 +3,7 @@ import warnings
 import glob
 import os
 
-def extraer_datos(ruta_repro, ruta_quantia, ruta_genesys):
+def extraer_datos(ruta_repro, ruta_quantia, ruta_genesys, ruta_reporte_bo):
     """
     Lee los archivos Excel completos en memoria.
     Retorna dos diccionarios donde la llave es el nombre de la hoja
@@ -27,5 +27,11 @@ def extraer_datos(ruta_repro, ruta_quantia, ruta_genesys):
         df_genesys = pd.concat(lista_dfs, ignore_index=True)
     else:
         df_genesys = pd.DataFrame() # Si la carpeta está vacía
+
+    print("⏳ Extrayendo datos de REPORTE BO...")
+    try:
+        df_reporte_bo = pd.read_csv(ruta_reporte_bo)
+    except Exception:
+        df_reporte_bo = pd.DataFrame()
     
-    return dict_repro, dict_quantia, df_genesys
+    return dict_repro, dict_quantia, df_genesys, df_reporte_bo

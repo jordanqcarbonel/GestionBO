@@ -516,11 +516,12 @@ col_main, col_podio = st.columns([2.3, 1], gap="large")
 # COLUMNA IZQUIERDA: PESTAÑAS PRINCIPALES
 # ------------------------------------------------------------------------------
 with col_main:
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Ranking General",
         "👤 Mi Avance Individual",
         "📋 Tabla Resumida",
-        "☁️ Cruce Gestión Cloud"
+        "☁️ Cruce Gestión Cloud",
+        "📦 Efectividad Entregas"
     ])
 
     # ==========================================================================
@@ -989,6 +990,81 @@ with col_main:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
             st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción.")
+
+    # ==========================================================================
+    # PESTAÑA 5: EFECTIVIDAD ENTREGAS - REPROGRAMACIONES
+    # ==========================================================================
+    with tab5:
+        st.markdown("### 📦 Efectividad Entregas - Reprogramaciones")
+        st.caption("Atribución exclusiva al último BO que gestionó un 'Contacto Válido' sobre la orden.")
+        
+        if 'Estado_Entrega' in df_filtrado.columns:
+            # Filtrar solo los registros que adquirieron el status de entrega (últimos válidos)
+            df_entregas = df_filtrado.dropna(subset=['Estado_Entrega', 'Semana del Mes']).copy()
+            
+            if not df_entregas.empty:
+                semanas = sorted(df_entregas['Semana del Mes'].unique())
+                estados_unicos = sorted(df_entregas['Estado_Entrega'].unique())
+                
+                datos_matriz = []
+                
+                # Agrupar por analista para construir la matriz plana
+                for bo, df_bo in df_entregas.groupby('Reprogramador'):
+                    total_bo_q = len(df_bo)
+                    
+                    for estado in estados_unicos:
+                        df_estado = df_bo[df_bo['Estado_Entrega'] == estado]
+                        fila = {
+                            "Analista": bo, 
+                            "Estado": estado
+                        }
+                        
+                        # Cálculos dinámicos por cada semana
+                        for sem in semanas:
+                            q_estado_sem = len(df_estado[df_estado['Semana del Mes'] == sem])
+                            q_total_sem = len(df_bo[df_bo['Semana del Mes'] == sem])
+                            
+                            fila[f"{sem} (Q)"] = q_estado_sem
+                            fila[f"{sem} (%)"] = (q_estado_sem / q_total_sem * 100.0) if q_total_sem > 0 else 0.0
+                            
+                        # Cálculos totales
+                        q_estado_total = len(df_estado)
+                        fila["Total (Q)"] = q_estado_total
+                        fila["Total (%)"] = (q_estado_total / total_bo_q * 100.0) if total_bo_q > 0 else 0.0
+                        
+                        datos_matriz.append(fila)
+                        
+                df_pivot = pd.DataFrame(datos_matriz)
+                
+                # Configuración dinámica de columnas para Streamlit
+                column_config = {
+                    "Analista": st.column_config.TextColumn("Analista", width="large"),
+                    "Estado": st.column_config.TextColumn("Estado_Entrega", width="medium"),
+                    "Total (Q)": st.column_config.NumberColumn("Total (Q)", format="%d"),
+                    "Total (%)": st.column_config.ProgressColumn(
+                        "Total (%)", 
+                        format="%.1f%%", 
+                        min_value=0.0, 
+                        max_value=100.0
+                    )
+                }
+                
+                # Formatear automáticamente todas las columnas semanales generadas
+                for sem in semanas:
+                    column_config[f"{sem} (Q)"] = st.column_config.NumberColumn(f"{sem} (Q)", format="%d")
+                    column_config[f"{sem} (%)"] = st.column_config.NumberColumn(f"{sem} (%)", format="%.0f%%")
+                
+                st.dataframe(
+                    df_pivot,
+                    column_config=column_config,
+                    hide_index=True,
+                    use_container_width=True,
+                    height=500
+                )
+            else:
+                st.info("No hay datos de entregas atribuidos a Contactos Válidos en este período.")
+        else:
+            st.warning("⚠️ La columna de entregas no existe. Verifica la extracción de ReporteBO.")
 
 # ------------------------------------------------------------------------------
 # COLUMNA DERECHA: PODIO DE HONOR VERTICAL (ALINEADO Y SIN SCROLL)

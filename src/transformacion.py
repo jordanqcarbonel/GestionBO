@@ -79,7 +79,7 @@ def estandarizar_y_unir(df, mapeo_columnas, nombre_hoja, categoria_origen):
     else:
         return pd.DataFrame()
 
-def transformar_datos(dict_repro, dict_quantia, df_genesys):
+def transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo):
     print("⚙️ Iniciando transformación y cálculo de TMO...")
 
     # --- 0. PREPARAR BASE CLOUD ---
@@ -104,9 +104,9 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys):
             
             # Bloque de Gestiones Regulares (1, 2 y 3)
             mapeo_gestiones = [
-                {'FECHA DE GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 1': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono'},
-                {'FECHA DE GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 2': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono'},
-                {'FECHA DE GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 3': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono'}
+                {'FECHA DE GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 1': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden'},
+                {'FECHA DE GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 2': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden'},
+                {'FECHA DE GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 3': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden'}
             ]
             df_gestiones = estandarizar_y_unir(df, mapeo_gestiones, hoja, 'GESTIÓN REPRO')
             
@@ -129,9 +129,9 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys):
         df = dict_repro['CAIDAS']
         # Como solo hay un reprogramador, lo asignamos a los 3 mapeos
         mapeo_caidas_unica = [
-            {'FECHA GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono'},
-            {'FECHA GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono'},
-            {'FECHA GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono'}
+            {'FECHA GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden'},
+            {'FECHA GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden'},
+            {'FECHA GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden'}
         ]
         df_caidas_unica = estandarizar_y_unir(df, mapeo_caidas_unica, 'CAIDAS', 'GESTIÓN REPRO')
         datos_procesados.append(df_caidas_unica)
@@ -216,6 +216,46 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys):
         df_final.drop(columns=['Telefono_Cloud', 'Reprogramador_Cloud', 'Llamada_Cloud', 'Telefono'], inplace=True, errors='ignore')
     else:
         df_final['Validación_Genesys'] = 'No aplica'
+
+        # --- CRUCE: EFECTIVIDAD DE ENTREGAS (ÚLTIMO CONTACTO VÁLIDO) ---
+    if not df_reporte_bo.empty and 'Orden' in df_final.columns:
+        # Estandarizar nombre de ordenes para que crucen perfecto
+        df_final['Orden'] = df_final['Orden'].astype(str).str.strip().str.upper()
+        df_reporte_bo['Orden'] = df_reporte_bo['Orden'].astype(str).str.strip().str.upper()
+        
+        # 1. Identificar el orden real de las gestiones usando el índice temporal
+        hojas_repro = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS']
+        
+        # Filtrar el universo: Solo Contactos Válidos de las hojas requeridas
+        df_validos = df_final[
+            (df_final['Tipo_Gestión'] == 'CONTACTO VALIDO') & 
+            (df_final['Hoja_Origen'].isin(hojas_repro))
+        ].copy()
+        
+        # 2. Ordenar por Orden y por Index (que mantiene el orden natural de Gestión 1, 2, 3)
+        df_validos = df_validos.sort_index().sort_values(by=['Orden', 'Fecha_Gestión'], kind='stable')
+        
+        # 3. Eliminar duplicados quedándonos solo con el ÚLTIMO contacto válido por Orden
+        df_ultimo_valido = df_validos.drop_duplicates(subset=['Orden'], keep='last')
+        
+        # 4. Crear flags en el df_final
+        indices_ultimos = df_ultimo_valido.index
+        df_final['Es_Ultimo_Contacto'] = False
+        df_final.loc[indices_ultimos, 'Es_Ultimo_Contacto'] = True
+        
+        # 5. Cruzar con el Reporte BO
+        df_final = df_final.merge(
+            df_reporte_bo[['Orden', 'Estado_Entrega', 'Semana del Mes']],
+            on='Orden',
+            how='left'
+        )
+        
+        # 6. Limpieza clave: Solo los registros que son "Último Contacto Válido" se quedan con la data de entrega
+        df_final.loc[~df_final['Es_Ultimo_Contacto'], 'Estado_Entrega'] = None
+        df_final.loc[~df_final['Es_Ultimo_Contacto'], 'Semana del Mes'] = None
+    else:
+        df_final['Estado_Entrega'] = None
+        df_final['Semana del Mes'] = None
     
     # 5. CRUZAR TMO
     # Si el Tipo_Gestión no está en la matriz, asigna 0 por defecto.
