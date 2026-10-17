@@ -811,7 +811,7 @@ with col_main:
             mime="text/csv"
         )
 
-    # ==========================================================================
+# ==========================================================================
     # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - VISTA INFOGRÁFICA WHATSAPP
     # ==========================================================================
     with tab4:
@@ -849,14 +849,22 @@ with col_main:
                 asesores_riesgo = pivot_gestion[pivot_gestion['Precisión (%)'] < 95.0]['Reprogramador'].unique()
                 
                 if len(asesores_riesgo) == 0:
-                    insight_texto = f"🏆 ¡Excelente! Todo el equipo mantiene una asertividad superior al 95%. Promedio: {promedio_equipo:.1f}%."
-                    color_insight = "#059669" # Verde éxito
+                    insight_texto = f"🏆 ¡Excelente! Todo el equipo mantiene una asertividad superior al 95%. Promedio general: {promedio_equipo:.1f}%."
+                    color_insight = "#059669" # Verde
                 else:
                     nombres_riesgo = ", ".join(asesores_riesgo[:2]) + (" y otros" if len(asesores_riesgo) > 2 else "")
-                    insight_texto = f"⚠️ Oportunidad de mejora: {len(asesores_riesgo)} asesor(es) por debajo del 95% (Revisar a {nombres_riesgo})."
+                    insight_texto = f"⚠️ Oportunidad de mejora: {len(asesores_riesgo)} asesor(es) por debajo de la meta del 95% (Revisar a {nombres_riesgo})."
                     color_insight = "#dc2626" # Rojo alerta
 
-                # 4. Construcción del Gráfico (Optimizado para captura de pantalla de WhatsApp)
+                # 4. Zoom Inteligente: Recortar la 'masa azul' inútil
+                # Encontrar el peor puntaje real (ignorando los 0% de asesores con problemas de mapeo)
+                min_prec_real = pivot_gestion[pivot_gestion['Precisión (%)'] >= 10]['Precisión (%)'].min()
+                if pd.isna(min_prec_real): min_prec_real = 80
+                
+                # El eje X iniciará 3 puntos abajo del peor puntaje real para magnificar las diferencias
+                rango_min = max(0, min_prec_real - 3)
+
+                # 5. Construcción del Gráfico (Optimizado para captura de pantalla)
                 fig_infografia = px.bar(
                     pivot_gestion,
                     x='Precisión (%)',
@@ -864,17 +872,17 @@ with col_main:
                     color='Tipo_Gestión',
                     barmode='group',
                     orientation='h',
-                    text=pivot_gestion['Precisión (%)'].apply(lambda x: f"{x:.1f}%"),
+                    text=pivot_gestion['Precisión (%)'].apply(lambda x: f"{x:.1f}%" if x > 0 else "⚠️ 0% (Revisar)"),
                     color_discrete_map={
                         'CONTACTO VALIDO': '#005cff',    # Azul Entel fuerte
                         'CONTACTO NO VALIDO': '#60a5fa'  # Azul Entel claro
                     }
                 )
                 
-                # Formateo estético para móvil
+                # Formateo estético para contraste
                 fig_infografia.update_traces(
                     textposition='outside', 
-                    textfont=dict(size=13, color="#1e293b", weight="bold"),
+                    textfont=dict(size=14, color="#0f172a", weight="bold"),
                     cliponaxis=False,
                     width=0.7 # Grosor de las barras
                 )
@@ -889,9 +897,9 @@ with col_main:
                     },
                     xaxis=dict(
                         title=None, 
-                        showticklabels=False, # Ocultamos los números de abajo porque ya están en la barra
-                        showgrid=False,
-                        range=[0, 115] # Rango hasta 115 para dar espacio al texto que va por fuera
+                        showticklabels=True, # Mostrar números guía abajo
+                        tickfont=dict(color="#94a3b8"),
+                        range=[rango_min, 115] # Aplicar el zoom dinámico
                     ),
                     yaxis=dict(
                         title=None, 
@@ -907,28 +915,24 @@ with col_main:
                     ),
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    margin=dict(l=10, r=40, t=100, b=10), # Margen superior amplio para el Insight
-                    height=max(400, len(pivot_gestion['Reprogramador'].unique()) * 80) # Altura dinámica perfecta
+                    margin=dict(l=10, r=40, t=100, b=20), # Margen superior amplio para el Insight
+                    height=max(400, len(pivot_gestion['Reprogramador'].unique()) * 85) # Altura dinámica
                 )
                 
-                # Línea objetivo (Meta visual del 100%)
+                # Línea objetivo visual (Meta 100%)
                 fig_infografia.add_vline(
                     x=100, line_width=2, line_dash="dash", line_color="#10b981",
-                    annotation_text="Meta 100%", annotation_position="top right",
-                    annotation_font=dict(size=11, color="#10b981", weight="bold")
+                    annotation_text="Meta 100%", annotation_position="top left",
+                    annotation_font=dict(size=12, color="#10b981", weight="bold")
                 )
 
-                # Mostrar el gráfico ocupando todo el ancho
-                st.plotly_chart(fig_infografia, use_container_width=True, config={'displayModeBar': False}) # Oculta la barra de herramientas al exportar/tomar foto
-                
-                # Mensaje de ayuda
-                st.caption("📸 *Consejo: Toma una captura de pantalla de esta vista. Está optimizada con los márgenes y colores adecuados para compartirse directamente por WhatsApp.*")
+                st.plotly_chart(fig_infografia, use_container_width=True, config={'displayModeBar': False})
+                st.caption("📸 *Consejo: Toma una captura de esta vista. El 'Zoom Inteligente' recorta el inicio de las barras para hacer evidentes las diferencias entre los asesores.*")
 
             else:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
             st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción.")
-
 # ------------------------------------------------------------------------------
 # COLUMNA DERECHA: PODIO DE HONOR VERTICAL (ALINEADO Y SIN SCROLL)
 # ------------------------------------------------------------------------------
