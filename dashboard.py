@@ -872,7 +872,7 @@ with col_main:
                         delta_color="inverse"
                     )
                 with col_k4:
-                    status_text = "🟢 ÓPTIMO" if tasa_global_asertividad >= 95.0 else ("🟡 ALERTA" if tasa_global_asertividad >= 93.0 else "🔴 CRÍTICO")
+                    status_text = "🟢 ÓPTIMO" if tasa_global_efectividad >= 95 else ("🟡 ALERTA" if tasa_global_efectividad >= 93 else "🔴 CRÍTICO")
                     st.metric(
                         label="Estado",
                         value=status_text
