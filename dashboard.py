@@ -919,6 +919,7 @@ with col_main:
                     resumen_bo.append({
                         "Back Office": agente,
                         "Total Base": n_tot,
+                        "Sin Cloud Visual": sin_cloud_a,
                         "Sin Cloud": sin_cloud_a,
                         "C. Válido (%)": asert_val,
                         "C. No Válido (%)": asert_noval,
@@ -933,6 +934,9 @@ with col_main:
                     # Ordenar priorizando a quienes presentan mayor volumen y tasa de error
                     df_resumen_cloud = df_resumen_cloud.sort_values(by=["Sin Cloud", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
 
+                    # 👈 Borra la columna numérica para que solo quede 'Sin Cloud Visual'
+                    df_resumen_cloud.drop(columns=["Sin Cloud"], inplace=True)
+                    
                     st.markdown("#### 📋 Resumen por Tipo de Contacto")
                     
                     # El foco visual va hacia % Desvío con ProgressColumn
