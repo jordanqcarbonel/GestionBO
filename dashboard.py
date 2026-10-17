@@ -812,12 +812,11 @@ with col_main:
         )
 
     # ==========================================================================
-    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS)
+    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - VISTA INFOGRÁFICA WHATSAPP
     # ==========================================================================
     with tab4:
-        st.markdown("### ☁️ Auditoría de Llamadas: Genesys Cloud")
-        st.caption("Resumen consolidado de asertividad telefónica (Filtro: Gestión Repro y Caídas | Solo Contactos).")
-
+        st.markdown("### ☁️ Auditoría Telefónica: Genesys Cloud")
+        
         if 'Validación_Genesys' in df_filtrado.columns:
             # 1. Filtro estricto: Hojas válidas Y Tipos de Gestión telefónica
             hojas_validas = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS'] 
@@ -830,95 +829,101 @@ with col_main:
             ].copy()
             
             if not df_cloud.empty:
-                # 2. Construir la tabla matricial solicitada
-                datos_tabla = []
-                for repro, df_repro in df_cloud.groupby('Reprogramador'):
-                    total_q = len(df_repro)
-                    total_si = len(df_repro[df_repro['Validación_Genesys'] == 'Sí'])
-                    total_no = total_q - total_si
-                    
-                    # Porcentaje Global (Escala 0 a 100)
-                    precision_global = (total_si / total_q * 100.0) if total_q > 0 else 0.0
+                # 2. Procesamiento de datos (Solo %)
+                pivot_gestion = pd.crosstab(
+                    index=[df_cloud['Reprogramador'], df_cloud['Tipo_Gestión']],
+                    columns=df_cloud['Validación_Genesys']
+                ).reset_index()
+                
+                if 'Sí' not in pivot_gestion.columns: pivot_gestion['Sí'] = 0
+                if 'No' not in pivot_gestion.columns: pivot_gestion['No'] = 0
+                
+                pivot_gestion['Total'] = pivot_gestion['Sí'] + pivot_gestion['No']
+                pivot_gestion['Precisión (%)'] = (pivot_gestion['Sí'] / pivot_gestion['Total']) * 100.0
+                
+                # Filtrar solo registros con al menos 1 gestión para evitar ruido
+                pivot_gestion = pivot_gestion[pivot_gestion['Total'] > 0].copy()
+                
+                # 3. GENERACIÓN DEL INSIGHT DINÁMICO (Inteligencia de Datos)
+                promedio_equipo = pivot_gestion['Precisión (%)'].mean()
+                asesores_riesgo = pivot_gestion[pivot_gestion['Precisión (%)'] < 95.0]['Reprogramador'].unique()
+                
+                if len(asesores_riesgo) == 0:
+                    insight_texto = f"🏆 ¡Excelente! Todo el equipo mantiene una asertividad superior al 95%. Promedio: {promedio_equipo:.1f}%."
+                    color_insight = "#059669" # Verde éxito
+                else:
+                    nombres_riesgo = ", ".join(asesores_riesgo[:2]) + (" y otros" if len(asesores_riesgo) > 2 else "")
+                    insight_texto = f"⚠️ Oportunidad de mejora: {len(asesores_riesgo)} asesor(es) por debajo del 95% (Revisar a {nombres_riesgo})."
+                    color_insight = "#dc2626" # Rojo alerta
 
-                    # Desglose: Contacto Válido
-                    df_cv = df_repro[df_repro['Tipo_Gestión'] == 'CONTACTO VALIDO']
-                    q_cv = len(df_cv)
-                    si_cv = len(df_cv[df_cv['Validación_Genesys'] == 'Sí'])
-                    pct_cv = (si_cv / q_cv * 100.0) if q_cv > 0 else None
-
-                    # Desglose: Contacto No Válido
-                    df_cnv = df_repro[df_repro['Tipo_Gestión'] == 'CONTACTO NO VALIDO']
-                    q_cnv = len(df_cnv)
-                    si_cnv = len(df_cnv[df_cnv['Validación_Genesys'] == 'Sí'])
-                    pct_cnv = (si_cnv / q_cnv * 100.0) if q_cnv > 0 else None
-
-                    datos_tabla.append({
-                        'Analista': repro,
-                        'Total (Q)': total_q,
-                        '✅ En Cloud (Q)': total_si,
-                        '❌ Sin Cloud (Q)': total_no,
-                        '🎯 Precisión Global': precision_global,
-                        '📞 C. Válido (% Cloud)': pct_cv,
-                        '📵 C. No Válido (% Cloud)': pct_cnv
-                    })
-                
-                df_resumen_cloud = pd.DataFrame(datos_tabla)
-                
-                # 3. Fila de Total General (Para replicar la estructura de tabla dinámica de Excel)
-                total_q_gen = df_resumen_cloud['Total (Q)'].sum()
-                total_si_gen = df_resumen_cloud['✅ En Cloud (Q)'].sum()
-                total_no_gen = df_resumen_cloud['❌ Sin Cloud (Q)'].sum()
-                precision_gen = (total_si_gen / total_q_gen * 100.0) if total_q_gen > 0 else 0.0
-                
-                df_cv_all = df_cloud[df_cloud['Tipo_Gestión'] == 'CONTACTO VALIDO']
-                si_cv_all = len(df_cv_all[df_cv_all['Validación_Genesys'] == 'Sí'])
-                pct_cv_all = (si_cv_all / len(df_cv_all) * 100.0) if not df_cv_all.empty else None
-                
-                df_cnv_all = df_cloud[df_cloud['Tipo_Gestión'] == 'CONTACTO NO VALIDO']
-                si_cnv_all = len(df_cnv_all[df_cnv_all['Validación_Genesys'] == 'Sí'])
-                pct_cnv_all = (si_cnv_all / len(df_cnv_all) * 100.0) if not df_cnv_all.empty else None
-
-                df_totales = pd.DataFrame([{
-                    'Analista': 'TOTAL GENERAL',
-                    'Total (Q)': total_q_gen,
-                    '✅ En Cloud (Q)': total_si_gen,
-                    '❌ Sin Cloud (Q)': total_no_gen,
-                    '🎯 Precisión Global': precision_gen,
-                    '📞 C. Válido (% Cloud)': pct_cv_all,
-                    '📵 C. No Válido (% Cloud)': pct_cnv_all
-                }])
-                
-                df_resumen_cloud = pd.concat([df_resumen_cloud, df_totales], ignore_index=True)
-
-                # 4. Renderizar la tabla con estilos personalizados
-                st.markdown("#### 📋 Matriz de Asertividad por Analista")
-                
-                st.dataframe(
-                    df_resumen_cloud,
-                    column_config={
-                        "Analista": st.column_config.TextColumn("Analista", width="large"),
-                        "Total (Q)": st.column_config.NumberColumn("Total (Q)", format="%d"),
-                        "✅ En Cloud (Q)": st.column_config.NumberColumn("✅ En Cloud (Q)", format="%d"),
-                        "❌ Sin Cloud (Q)": st.column_config.NumberColumn("❌ Sin Cloud (Q)", format="%d"),
-                        "🎯 Precisión Global": st.column_config.ProgressColumn(
-                            "🎯 Precisión Global", 
-                            format="%.1f%%", 
-                            min_value=0.0, 
-                            max_value=100.0  # Corrección de escala
-                        ),
-                        "📞 C. Válido (% Cloud)": st.column_config.NumberColumn(
-                            "📞 C. Válido (% Cloud)", 
-                            format="%.1f%%"
-                        ),
-                        "📵 C. No Válido (% Cloud)": st.column_config.NumberColumn(
-                            "📵 C. No Válido (% Cloud)", 
-                            format="%.1f%%"
-                        )
-                    },
-                    hide_index=True,
-                    use_container_width=True,
-                    height=450
+                # 4. Construcción del Gráfico (Optimizado para captura de pantalla de WhatsApp)
+                fig_infografia = px.bar(
+                    pivot_gestion,
+                    x='Precisión (%)',
+                    y='Reprogramador',
+                    color='Tipo_Gestión',
+                    barmode='group',
+                    orientation='h',
+                    text=pivot_gestion['Precisión (%)'].apply(lambda x: f"{x:.1f}%"),
+                    color_discrete_map={
+                        'CONTACTO VALIDO': '#005cff',    # Azul Entel fuerte
+                        'CONTACTO NO VALIDO': '#60a5fa'  # Azul Entel claro
+                    }
                 )
+                
+                # Formateo estético para móvil
+                fig_infografia.update_traces(
+                    textposition='outside', 
+                    textfont=dict(size=13, color="#1e293b", weight="bold"),
+                    cliponaxis=False,
+                    width=0.7 # Grosor de las barras
+                )
+                
+                fig_infografia.update_layout(
+                    title={
+                        'text': f"<b>Precisión de Registro Telefónico en Cloud</b><br><span style='font-size:14px; color:{color_insight};'>{insight_texto}</span>",
+                        'y': 0.95,
+                        'x': 0.01,
+                        'xanchor': 'left',
+                        'yanchor': 'top'
+                    },
+                    xaxis=dict(
+                        title=None, 
+                        showticklabels=False, # Ocultamos los números de abajo porque ya están en la barra
+                        showgrid=False,
+                        range=[0, 115] # Rango hasta 115 para dar espacio al texto que va por fuera
+                    ),
+                    yaxis=dict(
+                        title=None, 
+                        tickfont=dict(size=12, color="#0f172a", weight="bold")
+                    ),
+                    legend=dict(
+                        title=None,
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    ),
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=10, r=40, t=100, b=10), # Margen superior amplio para el Insight
+                    height=max(400, len(pivot_gestion['Reprogramador'].unique()) * 80) # Altura dinámica perfecta
+                )
+                
+                # Línea objetivo (Meta visual del 100%)
+                fig_infografia.add_vline(
+                    x=100, line_width=2, line_dash="dash", line_color="#10b981",
+                    annotation_text="Meta 100%", annotation_position="top right",
+                    annotation_font=dict(size=11, color="#10b981", weight="bold")
+                )
+
+                # Mostrar el gráfico ocupando todo el ancho
+                st.plotly_chart(fig_infografia, use_container_width=True, config={'displayModeBar': False}) # Oculta la barra de herramientas al exportar/tomar foto
+                
+                # Mensaje de ayuda
+                st.caption("📸 *Consejo: Toma una captura de pantalla de esta vista. Está optimizada con los márgenes y colores adecuados para compartirse directamente por WhatsApp.*")
+
             else:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
