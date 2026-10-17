@@ -875,7 +875,7 @@ with col_main:
                     st.metric(
                         label="Sin Registro Cloud",
                         value=f"{total_sin_cloud:,}".replace(",", "."),
-                        delta=f"{tasa_global_error:.1f}% Error",
+                        delta=f"{tasa_global_error:.0f}% Error",
                         delta_color="inverse"
                     )
                 with col_k4:
