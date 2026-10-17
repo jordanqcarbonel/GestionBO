@@ -811,131 +811,187 @@ with col_main:
             mime="text/csv"
         )
 
-# ==========================================================================
-    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - TASA DE INCUMPLIMIENTO
+    # ==========================================================================
+    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - REDISEÑO EJECUTIVO
     # ==========================================================================
     with tab4:
-        st.markdown("### ☁️ Auditoría Telefónica: Alertas de Incumplimiento")
-        st.caption("Seguimiento exclusivo a la tasa de gestiones NO registradas en Genesys Cloud (% Sin Cloud).")
+        st.markdown(
+            """
+            <div style="margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #005cff; font-weight: 700;">☁️ Auditoría Telefónica: Cruce Genesys Cloud</h3>
+                <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.85rem;">
+                    Monitoreo de asertividad entre gestión declarada en Excel vs llamadas reales en Genesys.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         if 'Validación_Genesys' in df_filtrado.columns:
-            # 1. Filtro estricto: Hojas válidas Y Tipos de Gestión telefónica
             hojas_validas = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS'] 
-            gestiones_telefónicas = ['CONTACTO VALIDO', 'CONTACTO NO VALIDO']
+            gestiones_telefonicas = ['CONTACTO VALIDO', 'CONTACTO NO VALIDO']
             
+            # Filtro estricto del universo auditable
             df_cloud = df_filtrado[
                 (df_filtrado['Validación_Genesys'].isin(['Sí', 'No'])) & 
                 (df_filtrado['Hoja_Origen'].isin(hojas_validas)) &
-                (df_filtrado['Tipo_Gestión'].isin(gestiones_telefónicas))
+                (df_filtrado['Tipo_Gestión'].isin(gestiones_telefonicas))
             ].copy()
             
             if not df_cloud.empty:
-                # 2. Procesamiento enfocado en % Sin Cloud (Tasa de Incumplimiento)
-                pivot_gestion = pd.crosstab(
-                    index=[df_cloud['Reprogramador'], df_cloud['Tipo_Gestión']],
-                    columns=df_cloud['Validación_Genesys']
-                ).reset_index()
+                # --------------------------------------------------------------
+                # 1. CÁLCULO DE MÉTRICAS GLOBALES Y POR ANALISTA
+                # --------------------------------------------------------------
+                total_gestiones = len(df_cloud)
+                total_con_cloud = (df_cloud['Validación_Genesys'] == 'Sí').sum()
+                total_sin_cloud = (df_cloud['Validación_Genesys'] == 'No').sum()
+                tasa_global_asertividad = (total_con_cloud / total_gestiones) * 100 if total_gestiones > 0 else 0.0
+                tasa_global_error = (total_sin_cloud / total_gestiones) * 100 if total_gestiones > 0 else 0.0
+
+                # --------------------------------------------------------------
+                # 2. BANNER DE KPIS EJECUTIVOS (OPTIMIZADO PARA WHATSAPP)
+                # --------------------------------------------------------------
+                col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
                 
-                if 'Sí' not in pivot_gestion.columns: pivot_gestion['Sí'] = 0
-                if 'No' not in pivot_gestion.columns: pivot_gestion['No'] = 0
-                
-                pivot_gestion['Total'] = pivot_gestion['Sí'] + pivot_gestion['No']
-                
-                # CÁLCULO CLAVE: Porcentaje de error (% NO está en Cloud)
-                pivot_gestion['% Sin Cloud'] = (pivot_gestion['No'] / pivot_gestion['Total']) * 100.0
-                
-                # Filtrar solo registros con al menos 1 gestión realizada
-                pivot_gestion = pivot_gestion[pivot_gestion['Total'] > 0].copy()
-                
-                # 3. INSIGHT DINÁMICO DE ALERTA DE NEGOCIO
-                tasa_error_promedio = pivot_gestion['% Sin Cloud'].mean()
-                asesores_alerta = pivot_gestion[pivot_gestion['% Sin Cloud'] > 5.0]['Reprogramador'].unique()
-                
-                if len(asesores_alerta) == 0:
-                    insight_texto = f"🟢 ¡Excelente adherencia! Ningún asesor supera el 5% de gestiones sin validar. Error promedio: {tasa_error_promedio:.1f}%."
-                    color_insight = "#059669" # Verde
+                with col_kpi1:
+                    st.metric(
+                        label="Total Auditadas",
+                        value=f"{total_gestiones:,}".replace(",", ".")
+                    )
+                with col_kpi2:
+                    st.metric(
+                        label="Llamadas Validadas",
+                        value=f"{total_con_cloud:,}".replace(",", "."),
+                        delta=f"{tasa_global_asertividad:.1f}% Cumplimiento"
+                    )
+                with col_kpi3:
+                    # En métricas de error, delta negativo o positivo según tolerancia
+                    st.metric(
+                        label="Sin Registro Cloud",
+                        value=f"{total_sin_cloud:,}".replace(",", "."),
+                        delta=f"{tasa_global_error:.1f}% Desvío",
+                        delta_color="inverse"
+                    )
+                with col_kpi4:
+                    status_text = "🟢 ÓPTIMO" if tasa_global_asertividad >= 98.0 else ("🟡 ALERTA" if tasa_global_asertividad >= 95.0 else "🔴 CRÍTICO")
+                    st.metric(
+                        label="Estado de Calidad",
+                        value=status_text
+                    )
+
+                st.markdown("<hr style='margin: 10px 0 18px 0; border: none; border-top: 1px solid #e2e8f0;'/>", unsafe_allow_html=True)
+
+                # --------------------------------------------------------------
+                # 3. TABLA COMPARATIVA EJECUTIVA POR REPROGRAMADOR
+                # --------------------------------------------------------------
+                # Agrupación por Analista y Tipo de Gestión
+                resumen_analista = []
+                analistas = sorted(df_cloud['Reprogramador'].dropna().unique())
+
+                for analista in analistas:
+                    df_a = df_cloud[df_cloud['Reprogramador'] == analista]
+                    n_tot = len(df_a)
+                    if n_tot == 0:
+                        continue
+                    
+                    # Contacto Válido
+                    df_val = df_a[df_a['Tipo_Gestión'] == 'CONTACTO VALIDO']
+                    n_val = len(df_val)
+                    asert_val = ((df_val['Validación_Genesys'] == 'Sí').sum() / n_val * 100) if n_val > 0 else None
+
+                    # Contacto No Válido
+                    df_noval = df_a[df_a['Tipo_Gestión'] == 'CONTACTO NO VALIDO']
+                    n_noval = len(df_noval)
+                    asert_noval = ((df_noval['Validación_Genesys'] == 'Sí').sum() / n_noval * 100) if n_noval > 0 else None
+
+                    # Asertividad global analista
+                    con_cloud_a = (df_a['Validación_Genesys'] == 'Sí').sum()
+                    sin_cloud_a = n_tot - con_cloud_a
+                    asert_global = (con_cloud_a / n_tot) * 100
+                    error_global = (sin_cloud_a / n_tot) * 100
+
+                    resumen_analista.append({
+                        "Analista": analista,
+                        "Total Gestiones": n_tot,
+                        "Sin Cloud (Casos)": sin_cloud_a,
+                        "% Asert. Contacto Válido": asert_val if asert_val is not None else 100.0,
+                        "% Asert. Contacto No Válido": asert_noval if asert_noval is not None else 100.0,
+                        "% Precisión Global": asert_global,
+                        "% Desvío": error_global
+                    })
+
+                df_resumen = pd.DataFrame(resumen_analista)
+
+                if not df_resumen.empty:
+                    # Ordenar priorizando a quienes presentan mayor volumen de desvíos (gestión por excepción)
+                    df_resumen = df_resumen.sort_values(by=["Sin Cloud (Casos)", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
+
+                    st.markdown("#### 📋 Matriz de Precisión por Analista")
+                    
+                    # Configuración visual de columnas nativa de Streamlit
+                    st.dataframe(
+                        df_resumen,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "Analista": st.column_config.TextColumn(
+                                "Analista / Reprogramador",
+                                help="Nombre del analista evaluado",
+                                width="medium"
+                            ),
+                            "Total Gestiones": st.column_config.NumberColumn(
+                                "Total Base",
+                                format="%d"
+                            ),
+                            "Sin Cloud (Casos)": st.column_config.NumberColumn(
+                                "❌ Sin Cloud",
+                                help="Total de casos sin cruce en Genesys",
+                                format="%d"
+                            ),
+                            "% Asert. Contacto Válido": st.column_config.NumberColumn(
+                                "Asert. Válido (%)",
+                                help="% de llamadas 'Contacto Válido' que sí existen en Genesys",
+                                format="%.1f%%"
+                            ),
+                            "% Asert. Contacto No Válido": st.column_config.NumberColumn(
+                                "Asert. No Válido (%)",
+                                help="% de llamadas 'Contacto No Válido' que sí existen en Genesys",
+                                format="%.1f%%"
+                            ),
+                            "% Precisión Global": st.column_config.ProgressColumn(
+                                "Cumplimiento Global",
+                                help="Porcentaje total de efectividad en cruce telefónico",
+                                format="%.1f%%",
+                                min_value=0,
+                                max_value=100
+                            ),
+                            "% Desvío": st.column_config.NumberColumn(
+                                "Error (%)",
+                                help="Tasa de incumplimiento telefónico",
+                                format="%.2f%%"
+                            )
+                        }
+                    )
+
+                    # ----------------------------------------------------------
+                    # 4. MONITOR DE DESVÍOS CRÍTICOS (SOLO VISIBLE SI HAY ERRORES)
+                    # ----------------------------------------------------------
+                    df_con_desvio = df_resumen[df_resumen["Sin Cloud (Casos)"] > 0]
+                    if not df_con_desvio.empty:
+                        with st.expander(f"⚠️ Detalle de Incumplimientos ({len(df_con_desvio)} analistas con desvíos)", expanded=False):
+                            st.caption("Visualización de casos que requieren auditoría manual de grabación:")
+                            st.dataframe(
+                                df_con_desvio[["Analista", "Total Gestiones", "Sin Cloud (Casos)", "% Desvío"]],
+                                use_container_width=True,
+                                hide_index=True
+                            )
                 else:
-                    nombres_alerta = ", ".join(asesores_alerta[:2]) + (" y otros" if len(asesores_alerta) > 2 else "")
-                    insight_texto = f"🚨 ALERTA: {len(asesores_alerta)} asesor(es) superan el 5% de llamadas NO registradas en Cloud ({nombres_alerta})."
-                    color_insight = "#dc2626" # Rojo Alerta
-
-                # 4. GRÁFICO DE ALERTAS (Escala limpia desde 0%)
-                # Ordenar para que las alertas más altas aparezcan arriba
-                pivot_gestion = pivot_gestion.sort_values(by='% Sin Cloud', ascending=True)
-
-                fig_alertas = px.bar(
-                    pivot_gestion,
-                    x='% Sin Cloud',
-                    y='Reprogramador',
-                    color='Tipo_Gestión',
-                    barmode='group',
-                    orientation='h',
-                    text=pivot_gestion['% Sin Cloud'].apply(lambda x: f"{x:.1f}%" if x > 0 else "0%"),
-                    color_discrete_map={
-                        'CONTACTO VALIDO': '#dc2626',      # Rojo fuerte para mayor visibilidad
-                        'CONTACTO NO VALIDO': '#f87171'    # Rojo suave
-                    }
-                )
-                
-                fig_alertas.update_traces(
-                    textposition='outside', 
-                    textfont=dict(size=13, color="#0f172a", weight="bold"),
-                    cliponaxis=False,
-                    width=0.7
-                )
-                
-                # Límite dinámico para el eje X para dar espacio a la etiqueta exterior
-                max_error = pivot_gestion['% Sin Cloud'].max()
-                limite_x = max(15.0, max_error + 5.0)
-
-                fig_alertas.update_layout(
-                    title={
-                        'text': f"<b>Tasa de Incumplimiento Telefónico (% Sin Registro en Cloud)</b><br><span style='font-size:14px; color:{color_insight};'>{insight_texto}</span>",
-                        'y': 0.95,
-                        'x': 0.01,
-                        'xanchor': 'left',
-                        'yanchor': 'top'
-                    },
-                    xaxis=dict(
-                        title=None, 
-                        showticklabels=True,
-                        ticksuffix="%",
-                        tickfont=dict(color="#64748b"),
-                        range=[0, limite_x] # Inicia estrictamente en 0%
-                    ),
-                    yaxis=dict(
-                        title=None, 
-                        tickfont=dict(size=12, color="#0f172a", weight="bold")
-                    ),
-                    legend=dict(
-                        title=None,
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1
-                    ),
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    margin=dict(l=10, r=40, t=100, b=20),
-                    height=max(400, len(pivot_gestion['Reprogramador'].unique()) * 80)
-                )
-                
-                # Línea Umbral de Alerta Max Aceptable (5%)
-                fig_alertas.add_vline(
-                    x=5.0, line_width=2, line_dash="dash", line_color="#f59e0b",
-                    annotation_text="Límite Máx Aceptable (5%)", annotation_position="top right",
-                    annotation_font=dict(size=11, color="#f59e0b", weight="bold")
-                )
-
-                st.plotly_chart(fig_alertas, use_container_width=True, config={'displayModeBar': False})
-                st.caption("📸 *Consejo: Toma una captura de pantalla. Las barras rojas más largas señalan directamente las inconsistencias a auditar.*")
-
+                    st.info("No se pudieron consolidar métricas por analista.")
             else:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
             st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción.")
-            
+
 # ------------------------------------------------------------------------------
 # COLUMNA DERECHA: PODIO DE HONOR VERTICAL (ALINEADO Y SIN SCROLL)
 # ------------------------------------------------------------------------------
