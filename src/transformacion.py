@@ -82,7 +82,7 @@ def transformar_datos(dict_repro, dict_quantia):
                 {'FECHA DE GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 2': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión'},
                 {'FECHA DE GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 3': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión'}
             ]
-            df_gestiones = estandarizar_y_unir(df, mapeo_gestiones, hoja, 'GESTIÓN REGULAR')
+            df_gestiones = estandarizar_y_unir(df, mapeo_gestiones, hoja, 'GESTIÓN REPRO')
             
             # Bloque de Análisis 1
             mapeo_analisis_1 = [
@@ -107,7 +107,7 @@ def transformar_datos(dict_repro, dict_quantia):
             {'FECHA GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión'},
             {'FECHA GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión'}
         ]
-        df_caidas_unica = estandarizar_y_unir(df, mapeo_caidas_unica, 'CAIDAS', 'GESTIÓN REGULAR')
+        df_caidas_unica = estandarizar_y_unir(df, mapeo_caidas_unica, 'CAIDAS', 'GESTIÓN REPRO')
         datos_procesados.append(df_caidas_unica)
 
     # 2.1 PROCESAR HOJA: ALERTAS
@@ -146,7 +146,7 @@ def transformar_datos(dict_repro, dict_quantia):
             )
             datos_procesados.append(df_procesado)
 
-    # Resto de hojas de Quantia (asumiendo que tienen la estructura BO 1, BO 2, etc.)
+    # Resto de hojas de Quantia
     for hoja, df in dict_quantia.items():
         if hoja not in hojas_subsanaciones:
             mapeo_quantia = [
