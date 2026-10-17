@@ -812,15 +812,15 @@ with col_main:
         )
 
     # ==========================================================================
-    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - REDISEÑO EJECUTIVO
+    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - ENFOQUE EJECUTIVO EN DESVÍOS
     # ==========================================================================
     with tab4:
         st.markdown(
             """
-            <div style="margin-bottom: 15px;">
+            <div style="margin-bottom: 12px;">
                 <h3 style="margin: 0; color: #005cff; font-weight: 700;">☁️ Auditoría Telefónica: Cruce Genesys Cloud</h3>
                 <p style="margin: 2px 0 0 0; color: #64748b; font-size: 0.85rem;">
-                    Monitoreo de asertividad entre gestión declarada en Excel vs llamadas reales en Genesys.
+                    Auditoría de asertividad entre gestión declarada en Excel vs llamadas reales en Genesys.
                 </p>
             </div>
             """,
@@ -840,7 +840,7 @@ with col_main:
             
             if not df_cloud.empty:
                 # --------------------------------------------------------------
-                # 1. CÁLCULO DE MÉTRICAS GLOBALES Y POR ANALISTA
+                # 1. CÁLCULO DE MÉTRICAS GLOBALES
                 # --------------------------------------------------------------
                 total_gestiones = len(df_cloud)
                 total_con_cloud = (df_cloud['Validación_Genesys'] == 'Sí').sum()
@@ -849,47 +849,46 @@ with col_main:
                 tasa_global_error = (total_sin_cloud / total_gestiones) * 100 if total_gestiones > 0 else 0.0
 
                 # --------------------------------------------------------------
-                # 2. BANNER DE KPIS EJECUTIVOS (OPTIMIZADO PARA WHATSAPP)
+                # 2. TARJETAS KPI RESUMEN (RESPONSIVE PARA PANELES CON PODIO)
                 # --------------------------------------------------------------
-                col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+                col_k1, col_k2, col_k3, col_k4 = st.columns(4)
                 
-                with col_kpi1:
+                with col_k1:
                     st.metric(
                         label="Total Auditadas",
                         value=f"{total_gestiones:,}".replace(",", ".")
                     )
-                with col_kpi2:
+                with col_k2:
                     st.metric(
                         label="Llamadas Validadas",
                         value=f"{total_con_cloud:,}".replace(",", "."),
-                        delta=f"{tasa_global_asertividad:.1f}% Cumplimiento"
+                        delta=f"{tasa_global_asertividad:.1f}% Asertividad"
                     )
-                with col_kpi3:
-                    # En métricas de error, delta negativo o positivo según tolerancia
+                with col_k3:
                     st.metric(
                         label="Sin Registro Cloud",
                         value=f"{total_sin_cloud:,}".replace(",", "."),
-                        delta=f"{tasa_global_error:.1f}% Desvío",
+                        delta=f"{tasa_global_error:.1f}% Error",
                         delta_color="inverse"
                     )
-                with col_kpi4:
+                with col_k4:
                     status_text = "🟢 ÓPTIMO" if tasa_global_asertividad >= 98.0 else ("🟡 ALERTA" if tasa_global_asertividad >= 95.0 else "🔴 CRÍTICO")
                     st.metric(
                         label="Estado de Calidad",
                         value=status_text
                     )
 
-                st.markdown("<hr style='margin: 10px 0 18px 0; border: none; border-top: 1px solid #e2e8f0;'/>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 8px 0 14px 0; border: none; border-top: 1px solid #e2e8f0;'/>", unsafe_allow_html=True)
 
                 # --------------------------------------------------------------
-                # 3. TABLA COMPARATIVA EJECUTIVA POR REPROGRAMADOR
+                # 3. CONSOLIDACIÓN DE DATOS POR BACK OFFICE (BO)
                 # --------------------------------------------------------------
-                # Agrupación por Analista y Tipo de Gestión
-                resumen_analista = []
-                analistas = sorted(df_cloud['Reprogramador'].dropna().unique())
+                resumen_bo = []
+                col_agente = 'Reprogramador' if 'Reprogramador' in df_cloud.columns else df_cloud.columns[0]
+                lista_bo = sorted(df_cloud[col_agente].dropna().unique())
 
-                for analista in analistas:
-                    df_a = df_cloud[df_cloud['Reprogramador'] == analista]
+                for agente in lista_bo:
+                    df_a = df_cloud[df_cloud[col_agente] == agente]
                     n_tot = len(df_a)
                     if n_tot == 0:
                         continue
@@ -897,96 +896,83 @@ with col_main:
                     # Contacto Válido
                     df_val = df_a[df_a['Tipo_Gestión'] == 'CONTACTO VALIDO']
                     n_val = len(df_val)
-                    asert_val = ((df_val['Validación_Genesys'] == 'Sí').sum() / n_val * 100) if n_val > 0 else None
+                    asert_val = ((df_val['Validación_Genesys'] == 'Sí').sum() / n_val * 100) if n_val > 0 else 100.0
 
                     # Contacto No Válido
                     df_noval = df_a[df_a['Tipo_Gestión'] == 'CONTACTO NO VALIDO']
                     n_noval = len(df_noval)
-                    asert_noval = ((df_noval['Validación_Genesys'] == 'Sí').sum() / n_noval * 100) if n_noval > 0 else None
+                    asert_noval = ((df_noval['Validación_Genesys'] == 'Sí').sum() / n_noval * 100) if n_noval > 0 else 100.0
 
-                    # Asertividad global analista
+                    # Métricas globales del BO
                     con_cloud_a = (df_a['Validación_Genesys'] == 'Sí').sum()
                     sin_cloud_a = n_tot - con_cloud_a
                     asert_global = (con_cloud_a / n_tot) * 100
                     error_global = (sin_cloud_a / n_tot) * 100
 
-                    resumen_analista.append({
-                        "Analista": analista,
-                        "Total Gestiones": n_tot,
-                        "Sin Cloud (Casos)": sin_cloud_a,
-                        "% Asert. Contacto Válido": asert_val if asert_val is not None else 100.0,
-                        "% Asert. Contacto No Válido": asert_noval if asert_noval is not None else 100.0,
-                        "% Precisión Global": asert_global,
+                    resumen_bo.append({
+                        "Back Office": agente,
+                        "Total Base": n_tot,
+                        "Sin Cloud": sin_cloud_a,
+                        "Asert. Válido (%)": asert_val,
+                        "Asert. No Válido (%)": asert_noval,
+                        "Cumplimiento Global (%)": asert_global,
                         "% Desvío": error_global
                     })
 
-                df_resumen = pd.DataFrame(resumen_analista)
+                df_resumen = pd.DataFrame(resumen_bo)
 
                 if not df_resumen.empty:
-                    # Ordenar priorizando a quienes presentan mayor volumen de desvíos (gestión por excepción)
-                    df_resumen = df_resumen.sort_values(by=["Sin Cloud (Casos)", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
+                    # Ordenar priorizando a quienes presentan mayor volumen y tasa de error
+                    df_resumen = df_resumen.sort_values(by=["Sin Cloud", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
 
-                    st.markdown("#### 📋 Matriz de Precisión por Analista")
+                    st.markdown("#### 📋 Matriz de Desvíos por Back Office")
                     
-                    # Configuración visual de columnas nativa de Streamlit
+                    # El foco visual va hacia % Desvío con ProgressColumn
                     st.dataframe(
                         df_resumen,
                         use_container_width=True,
                         hide_index=True,
                         column_config={
-                            "Analista": st.column_config.TextColumn(
-                                "Analista / Reprogramador",
-                                help="Nombre del analista evaluado",
+                            "Back Office": st.column_config.TextColumn(
+                                "BO / Ejecutivo",
+                                help="Nombre del personal de Back Office evaluado",
                                 width="medium"
                             ),
-                            "Total Gestiones": st.column_config.NumberColumn(
+                            "Total Base": st.column_config.NumberColumn(
                                 "Total Base",
                                 format="%d"
                             ),
-                            "Sin Cloud (Casos)": st.column_config.NumberColumn(
+                            "Sin Cloud": st.column_config.NumberColumn(
                                 "❌ Sin Cloud",
-                                help="Total de casos sin cruce en Genesys",
+                                help="Cantidad de llamadas declaradas que no figuran en Genesys",
                                 format="%d"
                             ),
-                            "% Asert. Contacto Válido": st.column_config.NumberColumn(
+                            "Asert. Válido (%)": st.column_config.NumberColumn(
                                 "Asert. Válido (%)",
-                                help="% de llamadas 'Contacto Válido' que sí existen en Genesys",
+                                help="% de llamadas 'Contacto Válido' validadas en Genesys",
                                 format="%.1f%%"
                             ),
-                            "% Asert. Contacto No Válido": st.column_config.NumberColumn(
+                            "Asert. No Válido (%)": st.column_config.NumberColumn(
                                 "Asert. No Válido (%)",
-                                help="% de llamadas 'Contacto No Válido' que sí existen en Genesys",
+                                help="% de llamadas 'Contacto No Válido' validadas en Genesys",
                                 format="%.1f%%"
                             ),
-                            "% Precisión Global": st.column_config.ProgressColumn(
-                                "Cumplimiento Global",
-                                help="Porcentaje total de efectividad en cruce telefónico",
-                                format="%.1f%%",
-                                min_value=0,
-                                max_value=100
+                            "Cumplimiento Global (%)": st.column_config.NumberColumn(
+                                "Cumplimiento (%)",
+                                help="Tasa global de efectividad telefónica",
+                                format="%.1f%%"
                             ),
-                            "% Desvío": st.column_config.NumberColumn(
+                            "% Desvío": st.column_config.ProgressColumn(
                                 "Error (%)",
-                                help="Tasa de incumplimiento telefónico",
-                                format="%.2f%%"
+                                help="Tasa de incumplimiento telefónico (foco de auditoría)",
+                                format="%.2f%%",
+                                min_value=0.0,
+                                max_value=max(float(df_resumen["% Desvío"].max() or 5.0), 5.0)  # Escala inteligente al desvío real
                             )
                         }
                     )
-
-                    # ----------------------------------------------------------
-                    # 4. MONITOR DE DESVÍOS CRÍTICOS (SOLO VISIBLE SI HAY ERRORES)
-                    # ----------------------------------------------------------
-                    df_con_desvio = df_resumen[df_resumen["Sin Cloud (Casos)"] > 0]
-                    if not df_con_desvio.empty:
-                        with st.expander(f"⚠️ Detalle de Incumplimientos ({len(df_con_desvio)} analistas con desvíos)", expanded=False):
-                            st.caption("Visualización de casos que requieren auditoría manual de grabación:")
-                            st.dataframe(
-                                df_con_desvio[["Analista", "Total Gestiones", "Sin Cloud (Casos)", "% Desvío"]],
-                                use_container_width=True,
-                                hide_index=True
-                            )
                 else:
-                    st.info("No se pudieron consolidar métricas por analista.")
+                    st.info("No se pudieron consolidar métricas por Back Office.")
             else:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
