@@ -816,14 +816,17 @@ with col_main:
     # ==========================================================================
     with tab4:
         st.markdown("### ☁️ Cruce Global de Llamadas con Genesys Cloud")
-        st.caption("Visión panorámica del equipo (Q y %) y desglose por Tipo de Gestión (Filtro exclusivo: Gestión Repro y Caídas).")
+        st.caption("Auditoría de llamadas (Q y %) filtrada exclusivamente para CONTACTO VÁLIDO y CONTACTO NO VÁLIDO en Gestión Repro y Caídas.")
 
         if 'Validación_Genesys' in df_filtrado.columns:
-            # 1. Filtro estricto: Solo hojas de Gestión Repro (APP, FONO, DIG, REPRO TLV) y CAIDAS
+            # 1. Filtro estricto: Hojas válidas Y Tipos de Gestión telefónica
             hojas_validas = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS'] 
+            gestiones_telefónicas = ['CONTACTO VALIDO', 'CONTACTO NO VALIDO']
+            
             df_cloud = df_filtrado[
                 (df_filtrado['Validación_Genesys'].isin(['Sí', 'No'])) & 
-                (df_filtrado['Hoja_Origen'].isin(hojas_validas))
+                (df_filtrado['Hoja_Origen'].isin(hojas_validas)) &
+                (df_filtrado['Tipo_Gestión'].isin(gestiones_telefónicas))
             ].copy()
             
             if not df_cloud.empty:
@@ -847,7 +850,7 @@ with col_main:
                     barmode='stack',
                     color_discrete_map={'Sí': '#005cff', 'No': '#ef4444'},
                     text='Etiqueta',
-                    title="<b>Cumplimiento Telefónico por Back Office</b>"
+                    title="<b>Cumplimiento Telefónico por Back Office (Solo Contactos)</b>"
                 )
                 
                 fig_cloud.update_traces(textposition='inside', textfont=dict(color="white", weight="bold", size=12))
@@ -856,7 +859,7 @@ with col_main:
                     yaxis_title=None,
                     legend_title="¿Figura en Cloud?",
                     margin=dict(l=10, r=20, t=50, b=20),
-                    height=max(350, len(resumen_bo['Reprogramador'].unique()) * 55) # Altura dinámica para verse grande
+                    height=max(350, len(resumen_bo['Reprogramador'].unique()) * 55) 
                 )
                 st.plotly_chart(fig_cloud, use_container_width=True)
 
@@ -888,17 +891,17 @@ with col_main:
                     column_config={
                         "Reprogramador": st.column_config.TextColumn("Analista", width="medium"),
                         "Tipo_Gestión": st.column_config.TextColumn("Tipo de Gestión", width="medium"),
-                        "Sí": st.column_config.NumberColumn("✅ En Cloud (Q)"),
-                        "No": st.column_config.NumberColumn("❌ Sin Cloud (Q)"),
+                        "Sí": st.column_config.NumberColumn("✅ En Cloud (Q)", format="%d"),
+                        "No": st.column_config.NumberColumn("❌ Sin Cloud (Q)", format="%d"),
                         "TOTAL GENERAL": st.column_config.NumberColumn("Total (Q)", format="%d"),
                         "% Cloud": st.column_config.ProgressColumn("Precisión", format="%.1f%%", min_value=0.0, max_value=1.0)
                     },
                     hide_index=True,
                     use_container_width=True,
-                    height=400 # Da espacio para visualizar varias filas con scroll nativo
+                    height=400 
                 )
             else:
-                st.info("No hay datos de Gestión Repro o Caídas para cruzar en el rango de fechas seleccionado.")
+                st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
             st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción.")
 
