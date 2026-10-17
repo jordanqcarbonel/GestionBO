@@ -812,11 +812,12 @@ with col_main:
         )
 
 # ==========================================================================
-    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - VISTA INFOGRÁFICA WHATSAPP
+    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS) - TASA DE INCUMPLIMIENTO
     # ==========================================================================
     with tab4:
-        st.markdown("### ☁️ Auditoría Telefónica: Genesys Cloud")
-        
+        st.markdown("### ☁️ Auditoría Telefónica: Alertas de Incumplimiento")
+        st.caption("Seguimiento exclusivo a la tasa de gestiones NO registradas en Genesys Cloud (% Sin Cloud).")
+
         if 'Validación_Genesys' in df_filtrado.columns:
             # 1. Filtro estricto: Hojas válidas Y Tipos de Gestión telefónica
             hojas_validas = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS'] 
@@ -829,7 +830,7 @@ with col_main:
             ].copy()
             
             if not df_cloud.empty:
-                # 2. Procesamiento de datos (Solo %)
+                # 2. Procesamiento enfocado en % Sin Cloud (Tasa de Incumplimiento)
                 pivot_gestion = pd.crosstab(
                     index=[df_cloud['Reprogramador'], df_cloud['Tipo_Gestión']],
                     columns=df_cloud['Validación_Genesys']
@@ -839,57 +840,57 @@ with col_main:
                 if 'No' not in pivot_gestion.columns: pivot_gestion['No'] = 0
                 
                 pivot_gestion['Total'] = pivot_gestion['Sí'] + pivot_gestion['No']
-                pivot_gestion['Precisión (%)'] = (pivot_gestion['Sí'] / pivot_gestion['Total']) * 100.0
                 
-                # Filtrar solo registros con al menos 1 gestión para evitar ruido
+                # CÁLCULO CLAVE: Porcentaje de error (% NO está en Cloud)
+                pivot_gestion['% Sin Cloud'] = (pivot_gestion['No'] / pivot_gestion['Total']) * 100.0
+                
+                # Filtrar solo registros con al menos 1 gestión realizada
                 pivot_gestion = pivot_gestion[pivot_gestion['Total'] > 0].copy()
                 
-                # 3. GENERACIÓN DEL INSIGHT DINÁMICO (Inteligencia de Datos)
-                promedio_equipo = pivot_gestion['Precisión (%)'].mean()
-                asesores_riesgo = pivot_gestion[pivot_gestion['Precisión (%)'] < 95.0]['Reprogramador'].unique()
+                # 3. INSIGHT DINÁMICO DE ALERTA DE NEGOCIO
+                tasa_error_promedio = pivot_gestion['% Sin Cloud'].mean()
+                asesores_alerta = pivot_gestion[pivot_gestion['% Sin Cloud'] > 5.0]['Reprogramador'].unique()
                 
-                if len(asesores_riesgo) == 0:
-                    insight_texto = f"🏆 ¡Excelente! Todo el equipo mantiene una asertividad superior al 95%. Promedio general: {promedio_equipo:.1f}%."
+                if len(asesores_alerta) == 0:
+                    insight_texto = f"🟢 ¡Excelente adherencia! Ningún asesor supera el 5% de gestiones sin validar. Error promedio: {tasa_error_promedio:.1f}%."
                     color_insight = "#059669" # Verde
                 else:
-                    nombres_riesgo = ", ".join(asesores_riesgo[:2]) + (" y otros" if len(asesores_riesgo) > 2 else "")
-                    insight_texto = f"⚠️ Oportunidad de mejora: {len(asesores_riesgo)} asesor(es) por debajo de la meta del 95% (Revisar a {nombres_riesgo})."
-                    color_insight = "#dc2626" # Rojo alerta
+                    nombres_alerta = ", ".join(asesores_alerta[:2]) + (" y otros" if len(asesores_alerta) > 2 else "")
+                    insight_texto = f"🚨 ALERTA: {len(asesores_alerta)} asesor(es) superan el 5% de llamadas NO registradas en Cloud ({nombres_alerta})."
+                    color_insight = "#dc2626" # Rojo Alerta
 
-                # 4. Zoom Inteligente: Recortar la 'masa azul' inútil
-                # Encontrar el peor puntaje real (ignorando los 0% de asesores con problemas de mapeo)
-                min_prec_real = pivot_gestion[pivot_gestion['Precisión (%)'] >= 10]['Precisión (%)'].min()
-                if pd.isna(min_prec_real): min_prec_real = 80
-                
-                # El eje X iniciará 3 puntos abajo del peor puntaje real para magnificar las diferencias
-                rango_min = max(0, min_prec_real - 3)
+                # 4. GRÁFICO DE ALERTAS (Escala limpia desde 0%)
+                # Ordenar para que las alertas más altas aparezcan arriba
+                pivot_gestion = pivot_gestion.sort_values(by='% Sin Cloud', ascending=True)
 
-                # 5. Construcción del Gráfico (Optimizado para captura de pantalla)
-                fig_infografia = px.bar(
+                fig_alertas = px.bar(
                     pivot_gestion,
-                    x='Precisión (%)',
+                    x='% Sin Cloud',
                     y='Reprogramador',
                     color='Tipo_Gestión',
                     barmode='group',
                     orientation='h',
-                    text=pivot_gestion['Precisión (%)'].apply(lambda x: f"{x:.1f}%" if x > 0 else "⚠️ 0% (Revisar)"),
+                    text=pivot_gestion['% Sin Cloud'].apply(lambda x: f"{x:.1f}%" if x > 0 else "0%"),
                     color_discrete_map={
-                        'CONTACTO VALIDO': '#005cff',    # Azul Entel fuerte
-                        'CONTACTO NO VALIDO': '#60a5fa'  # Azul Entel claro
+                        'CONTACTO VALIDO': '#dc2626',      # Rojo fuerte para mayor visibilidad
+                        'CONTACTO NO VALIDO': '#f87171'    # Rojo suave
                     }
                 )
                 
-                # Formateo estético para contraste
-                fig_infografia.update_traces(
+                fig_alertas.update_traces(
                     textposition='outside', 
-                    textfont=dict(size=14, color="#0f172a", weight="bold"),
+                    textfont=dict(size=13, color="#0f172a", weight="bold"),
                     cliponaxis=False,
-                    width=0.7 # Grosor de las barras
+                    width=0.7
                 )
                 
-                fig_infografia.update_layout(
+                # Límite dinámico para el eje X para dar espacio a la etiqueta exterior
+                max_error = pivot_gestion['% Sin Cloud'].max()
+                limite_x = max(15.0, max_error + 5.0)
+
+                fig_alertas.update_layout(
                     title={
-                        'text': f"<b>Precisión de Registro Telefónico en Cloud</b><br><span style='font-size:14px; color:{color_insight};'>{insight_texto}</span>",
+                        'text': f"<b>Tasa de Incumplimiento Telefónico (% Sin Registro en Cloud)</b><br><span style='font-size:14px; color:{color_insight};'>{insight_texto}</span>",
                         'y': 0.95,
                         'x': 0.01,
                         'xanchor': 'left',
@@ -897,9 +898,10 @@ with col_main:
                     },
                     xaxis=dict(
                         title=None, 
-                        showticklabels=True, # Mostrar números guía abajo
-                        tickfont=dict(color="#94a3b8"),
-                        range=[rango_min, 115] # Aplicar el zoom dinámico
+                        showticklabels=True,
+                        ticksuffix="%",
+                        tickfont=dict(color="#64748b"),
+                        range=[0, limite_x] # Inicia estrictamente en 0%
                     ),
                     yaxis=dict(
                         title=None, 
@@ -915,24 +917,25 @@ with col_main:
                     ),
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    margin=dict(l=10, r=40, t=100, b=20), # Margen superior amplio para el Insight
-                    height=max(400, len(pivot_gestion['Reprogramador'].unique()) * 85) # Altura dinámica
+                    margin=dict(l=10, r=40, t=100, b=20),
+                    height=max(400, len(pivot_gestion['Reprogramador'].unique()) * 80)
                 )
                 
-                # Línea objetivo visual (Meta 100%)
-                fig_infografia.add_vline(
-                    x=100, line_width=2, line_dash="dash", line_color="#10b981",
-                    annotation_text="Meta 100%", annotation_position="top left",
-                    annotation_font=dict(size=12, color="#10b981", weight="bold")
+                # Línea Umbral de Alerta Max Aceptable (5%)
+                fig_alertas.add_vline(
+                    x=5.0, line_width=2, line_dash="dash", line_color="#f59e0b",
+                    annotation_text="Límite Máx Aceptable (5%)", annotation_position="top right",
+                    annotation_font=dict(size=11, color="#f59e0b", weight="bold")
                 )
 
-                st.plotly_chart(fig_infografia, use_container_width=True, config={'displayModeBar': False})
-                st.caption("📸 *Consejo: Toma una captura de esta vista. El 'Zoom Inteligente' recorta el inicio de las barras para hacer evidentes las diferencias entre los asesores.*")
+                st.plotly_chart(fig_alertas, use_container_width=True, config={'displayModeBar': False})
+                st.caption("📸 *Consejo: Toma una captura de pantalla. Las barras rojas más largas señalan directamente las inconsistencias a auditar.*")
 
             else:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
         else:
             st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción.")
+            
 # ------------------------------------------------------------------------------
 # COLUMNA DERECHA: PODIO DE HONOR VERTICAL (ALINEADO Y SIN SCROLL)
 # ------------------------------------------------------------------------------
