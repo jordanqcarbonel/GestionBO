@@ -6,6 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Rutas locales de los archivos Excel sincronizados con OneDrive
 RUTA_REPRO = Path(r"C:\Users\vorte\scc.com.pe\Karen Flores - BO\GESTION REPRO - ENTEL PERU.xlsx")
 RUTA_QUANTIA = Path(r"C:\Users\vorte\scc.com.pe\Karen Flores - BO\QUANTIA - SUBSANACIONES.xlsx")
+RUTA_GENESYS = Path(r"G:\GestiónBO\genesys")
 
 # Directorio de salida para el CSV procesado que leerá Streamlit
 CARPETA_SALIDA = BASE_DIR / "output"

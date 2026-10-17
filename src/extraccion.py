@@ -1,7 +1,9 @@
 import pandas as pd
 import warnings
+import glob
+import os
 
-def extraer_datos(ruta_repro, ruta_quantia):
+def extraer_datos(ruta_repro, ruta_quantia, ruta_genesys):
     """
     Lee los archivos Excel completos en memoria.
     Retorna dos diccionarios donde la llave es el nombre de la hoja
@@ -15,5 +17,15 @@ def extraer_datos(ruta_repro, ruta_quantia):
     
     print("⏳ Extrayendo datos de QUANTIA...")
     dict_quantia = pd.read_excel(ruta_quantia, sheet_name=None)
+
+    print("⏳ Extrayendo datos de GENESYS...")
+    # Leer todos los CSV de la carpeta y unirlos
+    archivos_csv = glob.glob(os.path.join(ruta_genesys, "*.csv"))
+    if archivos_csv:
+        # Se asume que están separados por comas. Si es por punto y coma, añade sep=';' en read_csv
+        lista_dfs = [pd.read_csv(archivo) for archivo in archivos_csv]
+        df_genesys = pd.concat(lista_dfs, ignore_index=True)
+    else:
+        df_genesys = pd.DataFrame() # Si la carpeta está vacía
     
-    return dict_repro, dict_quantia
+    return dict_repro, dict_quantia, df_genesys

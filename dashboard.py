@@ -509,10 +509,11 @@ col_main, col_podio = st.columns([2.3, 1], gap="large")
 # COLUMNA IZQUIERDA: PESTAÑAS PRINCIPALES
 # ------------------------------------------------------------------------------
 with col_main:
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📊 Ranking General",
         "👤 Mi Avance Individual",
-        "📋 Tabla Resumida"
+        "📋 Tabla Resumida",
+        "☁️ Cruce Gestión Cloud"
     ])
 
     # ==========================================================================
@@ -810,6 +811,70 @@ with col_main:
             mime="text/csv"
         )
 
+    # ==========================================================================
+    # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS)
+    # ==========================================================================
+    with tab4:
+        st.markdown("### ☁️ Cruce de Llamadas con Genesys Cloud")
+        st.caption("Auditoría de gestiones telefónicas (APP, FONO, REPRO TLV, CAIDAS) cruzadas automáticamente con el reporte de Cloud.")
+
+        # Filtrar solo los registros que aplican para cruce (tienen 'Sí' o 'No')
+        if 'Validación_Genesys' in df_filtrado.columns:
+            df_cloud = df_filtrado[df_filtrado['Validación_Genesys'].isin(['Sí', 'No'])].copy()
+            
+            if not df_cloud.empty:
+                col_c1, col_c2 = st.columns([1, 2])
+                
+                with col_c1:
+                    # Gráfico de dona general (Total Equipo)
+                    resumen_general = df_cloud['Validación_Genesys'].value_counts().reset_index()
+                    resumen_general.columns = ['Estado', 'Cantidad']
+                    
+                    fig_cloud_pie = px.pie(
+                        resumen_general,
+                        names='Estado',
+                        values='Cantidad',
+                        hole=0.5,
+                        title="<b>Precisión General (Equipo)</b>",
+                        color='Estado',
+                        color_discrete_map={'Sí': '#005cff', 'No': '#ef4444'} # Azul corporativo para Sí, Rojo para No
+                    )
+                    fig_cloud_pie.update_traces(textposition='inside', textinfo='percent+value')
+                    fig_cloud_pie.update_layout(
+                        margin=dict(l=20, r=20, t=40, b=20),
+                        height=350,
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.2)
+                    )
+                    st.plotly_chart(fig_cloud_pie, use_container_width=True)
+                
+                with col_c2:
+                    # Gráfico de barras apiladas por asesor (Q)
+                    resumen_asesor = df_cloud.groupby(['Reprogramador', 'Validación_Genesys']).size().reset_index(name='Cantidad')
+                    
+                    fig_cloud_bar = px.bar(
+                        resumen_asesor,
+                        x='Cantidad',
+                        y='Reprogramador',
+                        color='Validación_Genesys',
+                        orientation='h',
+                        title="<b>Validación Telefónica por Back Office (Q)</b>",
+                        color_discrete_map={'Sí': '#005cff', 'No': '#ef4444'},
+                        text='Cantidad',
+                        barmode='stack'
+                    )
+                    fig_cloud_bar.update_traces(textposition='inside', textfont=dict(color="white", weight="bold"))
+                    fig_cloud_bar.update_layout(
+                        xaxis_title="Cantidad de Gestiones (Q)",
+                        yaxis_title=None,
+                        legend_title="¿Figura en Cloud?",
+                        margin=dict(l=10, r=20, t=40, b=20),
+                        height=max(350, len(df_cloud['Reprogramador'].unique()) * 40)
+                    )
+                    st.plotly_chart(fig_cloud_bar, use_container_width=True)
+            else:
+                st.info("No hay datos telefónicos para cruzar en el rango de fechas seleccionado.")
+        else:
+            st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción completo con las últimas actualizaciones.")
 
 # ------------------------------------------------------------------------------
 # COLUMNA DERECHA: PODIO DE HONOR VERTICAL (ALINEADO Y SIN SCROLL)
