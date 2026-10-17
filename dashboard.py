@@ -815,11 +815,11 @@ with col_main:
     # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS)
     # ==========================================================================
     with tab4:
-        st.markdown("### ☁️ Cruce Individual con Genesys Cloud")
-        st.caption("Auditoría telefónica detallada por analista y tipo de gestión (Filtro exclusivo: Gestión Repro y Caídas).")
+        st.markdown("### ☁️ Cruce Global de Llamadas con Genesys Cloud")
+        st.caption("Visión panorámica del equipo (Q y %) y desglose por Tipo de Gestión (Filtro exclusivo: Gestión Repro y Caídas).")
 
         if 'Validación_Genesys' in df_filtrado.columns:
-            # 1. Filtrar solo los registros con teléfono ('Sí' o 'No') y que pertenezcan a Repro/Caídas
+            # 1. Filtro estricto: Solo hojas de Gestión Repro (APP, FONO, DIG, REPRO TLV) y CAIDAS
             hojas_validas = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS'] 
             df_cloud = df_filtrado[
                 (df_filtrado['Validación_Genesys'].isin(['Sí', 'No'])) & 
@@ -827,78 +827,80 @@ with col_main:
             ].copy()
             
             if not df_cloud.empty:
-                # 2. Selector de Back Office (Enfoque 100% individual)
-                lista_bo_cloud = df_cloud['Reprogramador'].sort_values().unique().tolist()
+                # --- PREPARACIÓN DE DATOS PARA GRÁFICO ---
+                resumen_bo = df_cloud.groupby(['Reprogramador', 'Validación_Genesys']).size().reset_index(name='Cantidad')
                 
-                col_sel, _ = st.columns([1, 2])
-                with col_sel:
-                    bo_seleccionado = st.selectbox("👤 Seleccionar Analista para Auditoría:", options=lista_bo_cloud)
+                # Calcular el total por BO para extraer el porcentaje
+                total_bo = resumen_bo.groupby('Reprogramador')['Cantidad'].transform('sum')
+                resumen_bo['Porcentaje'] = (resumen_bo['Cantidad'] / total_bo) * 100
                 
-                # Filtrar la data solo para el BO elegido
-                df_individual = df_cloud[df_cloud['Reprogramador'] == bo_seleccionado]
+                # Etiqueta combinada: Q (X.X%)
+                resumen_bo['Etiqueta'] = resumen_bo.apply(lambda x: f"{int(x['Cantidad'])} ({x['Porcentaje']:.1f}%)", axis=1)
                 
-                st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-                col_chart, col_table = st.columns([1.2, 1], gap="large")
+                # --- GRÁFICO PRINCIPAL ---
+                fig_cloud = px.bar(
+                    resumen_bo,
+                    x='Cantidad',
+                    y='Reprogramador',
+                    color='Validación_Genesys',
+                    orientation='h',
+                    barmode='stack',
+                    color_discrete_map={'Sí': '#005cff', 'No': '#ef4444'},
+                    text='Etiqueta',
+                    title="<b>Cumplimiento Telefónico por Back Office</b>"
+                )
                 
-                with col_chart:
-                    # 3. Gráfico de Barras Apiladas identificando el Tipo de Gestión
-                    resumen_chart = df_individual.groupby(['Tipo_Gestión', 'Validación_Genesys']).size().reset_index(name='Cantidad')
-                    
-                    fig_cloud = px.bar(
-                        resumen_chart,
-                        x='Cantidad',
-                        y='Tipo_Gestión',
-                        color='Validación_Genesys',
-                        orientation='h',
-                        barmode='stack',
-                        color_discrete_map={'Sí': '#005cff', 'No': '#ef4444'},
-                        text='Cantidad',
-                        title=f"<b>Validación por Tipo de Gestión: {bo_seleccionado}</b>"
-                    )
-                    
-                    fig_cloud.update_traces(textposition='inside', textfont=dict(color="white", weight="bold"))
-                    fig_cloud.update_layout(
-                        xaxis_title="Cantidad de Gestiones (Q)",
-                        yaxis_title="Tipo de Gestión",
-                        legend_title="¿Figura en Cloud?",
-                        margin=dict(l=10, r=20, t=50, b=20),
-                        height=max(300, len(resumen_chart['Tipo_Gestión'].unique()) * 70)
-                    )
-                    st.plotly_chart(fig_cloud, use_container_width=True)
+                fig_cloud.update_traces(textposition='inside', textfont=dict(color="white", weight="bold", size=12))
+                fig_cloud.update_layout(
+                    xaxis_title="Cantidad de Gestiones (Q)",
+                    yaxis_title=None,
+                    legend_title="¿Figura en Cloud?",
+                    margin=dict(l=10, r=20, t=50, b=20),
+                    height=max(350, len(resumen_bo['Reprogramador'].unique()) * 55) # Altura dinámica para verse grande
+                )
+                st.plotly_chart(fig_cloud, use_container_width=True)
 
-                with col_table:
-                    # 4. Tabla dinámica resumen para ver el Q exacto y el % de forma limpia
-                    pivot_cloud = pd.crosstab(
-                        index=df_individual['Tipo_Gestión'],
-                        columns=df_individual['Validación_Genesys'],
-                        margins=True,
-                        margins_name='TOTAL GENERAL'
-                    ).reset_index()
-                    
-                    # Asegurar que existan ambas columnas para evitar errores visuales
-                    if 'Sí' not in pivot_cloud.columns: pivot_cloud['Sí'] = 0
-                    if 'No' not in pivot_cloud.columns: pivot_cloud['No'] = 0
-                    
-                    # Calcular precisión
-                    pivot_cloud['% Cloud'] = (pivot_cloud['Sí'] / pivot_cloud['TOTAL GENERAL']).fillna(0)
-                    
-                    st.markdown("**Tabla de Precisión (Q y %)**")
-                    st.dataframe(
-                        pivot_cloud,
-                        column_config={
-                            "Tipo_Gestión": st.column_config.TextColumn("Tipo de Gestión", width="medium"),
-                            "Sí": st.column_config.NumberColumn("✅ En Cloud (Q)", format="%d"),
-                            "No": st.column_config.NumberColumn("❌ Sin Cloud (Q)", format="%d"),
-                            "TOTAL GENERAL": st.column_config.NumberColumn("Total (Q)", format="%d"),
-                            "% Cloud": st.column_config.ProgressColumn("Precisión", format="%.1f%%", min_value=0.0, max_value=1.0)
-                        },
-                        hide_index=True,
-                        use_container_width=True
-                    )
+                st.divider()
+
+                # --- TABLA DE DESGLOSE POR TIPO DE GESTIÓN ---
+                st.markdown("#### 📋 Desglose por Tipo de Gestión y Analista")
+                
+                # Pivot table para cruzar BO, Tipo de Gestión y asertividad
+                pivot_gestion = pd.crosstab(
+                    index=[df_cloud['Reprogramador'], df_cloud['Tipo_Gestión']],
+                    columns=df_cloud['Validación_Genesys'],
+                    margins=True,
+                    margins_name='TOTAL GENERAL'
+                ).reset_index()
+                
+                # Asegurar columnas por si en un día hubo 100% de "Sí" o 100% de "No"
+                if 'Sí' not in pivot_gestion.columns: pivot_gestion['Sí'] = 0
+                if 'No' not in pivot_gestion.columns: pivot_gestion['No'] = 0
+                
+                # Calcular Precisión
+                pivot_gestion['% Cloud'] = (pivot_gestion['Sí'] / pivot_gestion['TOTAL GENERAL']).fillna(0)
+                
+                # Limpiar el nombre de la última fila de márgenes para estética
+                pivot_gestion.loc[pivot_gestion['Reprogramador'] == 'TOTAL GENERAL', 'Tipo_Gestión'] = '-'
+                
+                st.dataframe(
+                    pivot_gestion,
+                    column_config={
+                        "Reprogramador": st.column_config.TextColumn("Analista", width="medium"),
+                        "Tipo_Gestión": st.column_config.TextColumn("Tipo de Gestión", width="medium"),
+                        "Sí": st.column_config.NumberColumn("✅ En Cloud (Q)"),
+                        "No": st.column_config.NumberColumn("❌ Sin Cloud (Q)"),
+                        "TOTAL GENERAL": st.column_config.NumberColumn("Total (Q)", format="%d"),
+                        "% Cloud": st.column_config.ProgressColumn("Precisión", format="%.1f%%", min_value=0.0, max_value=1.0)
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    height=400 # Da espacio para visualizar varias filas con scroll nativo
+                )
             else:
-                st.info("No hay datos telefónicos de Gestión Repro o Caídas para cruzar en el rango de fechas seleccionado.")
+                st.info("No hay datos de Gestión Repro o Caídas para cruzar en el rango de fechas seleccionado.")
         else:
-            st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción completo.")
+            st.warning("⚠️ La columna 'Validación_Genesys' no existe. Asegúrate de haber ejecutado el pipeline de extracción.")
 
 # ------------------------------------------------------------------------------
 # COLUMNA DERECHA: PODIO DE HONOR VERTICAL (ALINEADO Y SIN SCROLL)
