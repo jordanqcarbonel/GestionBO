@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# FUNCIÓN DE CÁLCULO DE TMO LABORABLE
+# FUNCIÓN DE CÁLCULO DE TMO LABORABLE Y ALERTA SIN CLOUD
 # ==============================================================================
 def calcular_tmo_laborable(inicio: date, fin: date) -> int:
     """
@@ -929,6 +929,7 @@ with col_main:
                 df_resumen_cloud = pd.DataFrame(resumen_bo)
 
                 if not df_resumen_cloud.empty:
+                    df_resumen_cloud["Sin Cloud Visual"] = df_resumen_cloud["Sin Cloud"].apply(agregar_alerta_sin_cloud)   
                     # Ordenar priorizando a quienes presentan mayor volumen y tasa de error
                     df_resumen_cloud = df_resumen_cloud.sort_values(by=["Sin Cloud", "% Desvío"], ascending=[False, False]).reset_index(drop=True)
 
