@@ -942,11 +942,13 @@ with col_main:
                                 "Total Gestiones",
                                 format="%d"
                             ),
-                            "Sin Cloud": st.column_config.NumberColumn(
+                            "Sin Cloud": st.column_config.ProgressColumn(
                                 "❌ Sin Cloud",
                                 help="Cantidad de llamadas tipificadas que no figuran en Genesys Cloud",
-                                format="%d"
-                            ),
+                                format="%d",
+                                min_value=0,
+                                max_value=int(df_resumen_cloud["Sin Cloud"].max()) if not df_resumen_cloud.empty else 20
+),
                             "C. Válido (%)": st.column_config.NumberColumn(
                                 "C. Válido (%)",
                                 help="% de llamadas 'Contacto Válido' validadas en Genesys Cloud",
