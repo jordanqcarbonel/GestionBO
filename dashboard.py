@@ -815,8 +815,8 @@ with col_main:
     # PESTAÑA 4: CRUCE GESTIÓN CLOUD (GENESYS)
     # ==========================================================================
     with tab4:
-        st.markdown("### ☁️ Cruce Global de Llamadas con Genesys Cloud")
-        st.caption("Auditoría de llamadas (Q y %) filtrada exclusivamente para CONTACTO VÁLIDO y CONTACTO NO VÁLIDO en Gestión Repro y Caídas.")
+        st.markdown("### ☁️ Auditoría de Llamadas: Genesys Cloud")
+        st.caption("Resumen consolidado de asertividad telefónica (Filtro: Gestión Repro y Caídas | Solo Contactos).")
 
         if 'Validación_Genesys' in df_filtrado.columns:
             # 1. Filtro estricto: Hojas válidas Y Tipos de Gestión telefónica
@@ -830,75 +830,94 @@ with col_main:
             ].copy()
             
             if not df_cloud.empty:
-                # --- PREPARACIÓN DE DATOS PARA GRÁFICO ---
-                resumen_bo = df_cloud.groupby(['Reprogramador', 'Validación_Genesys']).size().reset_index(name='Cantidad')
-                
-                # Calcular el total por BO para extraer el porcentaje
-                total_bo = resumen_bo.groupby('Reprogramador')['Cantidad'].transform('sum')
-                resumen_bo['Porcentaje'] = (resumen_bo['Cantidad'] / total_bo) * 100
-                
-                # Etiqueta combinada: Q (X.X%)
-                resumen_bo['Etiqueta'] = resumen_bo.apply(lambda x: f"{int(x['Cantidad'])} ({x['Porcentaje']:.1f}%)", axis=1)
-                
-                # --- GRÁFICO PRINCIPAL ---
-                fig_cloud = px.bar(
-                    resumen_bo,
-                    x='Cantidad',
-                    y='Reprogramador',
-                    color='Validación_Genesys',
-                    orientation='h',
-                    barmode='stack',
-                    color_discrete_map={'Sí': '#005cff', 'No': '#ef4444'},
-                    text='Etiqueta',
-                    title="<b>Cumplimiento Telefónico por Back Office (Solo Contactos)</b>"
-                )
-                
-                fig_cloud.update_traces(textposition='inside', textfont=dict(color="white", weight="bold", size=12))
-                fig_cloud.update_layout(
-                    xaxis_title="Cantidad de Gestiones (Q)",
-                    yaxis_title=None,
-                    legend_title="¿Figura en Cloud?",
-                    margin=dict(l=10, r=20, t=50, b=20),
-                    height=max(350, len(resumen_bo['Reprogramador'].unique()) * 55) 
-                )
-                st.plotly_chart(fig_cloud, use_container_width=True)
+                # 2. Construir la tabla matricial solicitada
+                datos_tabla = []
+                for repro, df_repro in df_cloud.groupby('Reprogramador'):
+                    total_q = len(df_repro)
+                    total_si = len(df_repro[df_repro['Validación_Genesys'] == 'Sí'])
+                    total_no = total_q - total_si
+                    
+                    # Porcentaje Global (Escala 0 a 100)
+                    precision_global = (total_si / total_q * 100.0) if total_q > 0 else 0.0
 
-                st.divider()
+                    # Desglose: Contacto Válido
+                    df_cv = df_repro[df_repro['Tipo_Gestión'] == 'CONTACTO VALIDO']
+                    q_cv = len(df_cv)
+                    si_cv = len(df_cv[df_cv['Validación_Genesys'] == 'Sí'])
+                    pct_cv = (si_cv / q_cv * 100.0) if q_cv > 0 else None
 
-                # --- TABLA DE DESGLOSE POR TIPO DE GESTIÓN ---
-                st.markdown("#### 📋 Desglose por Tipo de Gestión y Analista")
+                    # Desglose: Contacto No Válido
+                    df_cnv = df_repro[df_repro['Tipo_Gestión'] == 'CONTACTO NO VALIDO']
+                    q_cnv = len(df_cnv)
+                    si_cnv = len(df_cnv[df_cnv['Validación_Genesys'] == 'Sí'])
+                    pct_cnv = (si_cnv / q_cnv * 100.0) if q_cnv > 0 else None
+
+                    datos_tabla.append({
+                        'Analista': repro,
+                        'Total (Q)': total_q,
+                        '✅ En Cloud (Q)': total_si,
+                        '❌ Sin Cloud (Q)': total_no,
+                        '🎯 Precisión Global': precision_global,
+                        '📞 C. Válido (% Cloud)': pct_cv,
+                        '📵 C. No Válido (% Cloud)': pct_cnv
+                    })
                 
-                # Pivot table para cruzar BO, Tipo de Gestión y asertividad
-                pivot_gestion = pd.crosstab(
-                    index=[df_cloud['Reprogramador'], df_cloud['Tipo_Gestión']],
-                    columns=df_cloud['Validación_Genesys'],
-                    margins=True,
-                    margins_name='TOTAL GENERAL'
-                ).reset_index()
+                df_resumen_cloud = pd.DataFrame(datos_tabla)
                 
-                # Asegurar columnas por si en un día hubo 100% de "Sí" o 100% de "No"
-                if 'Sí' not in pivot_gestion.columns: pivot_gestion['Sí'] = 0
-                if 'No' not in pivot_gestion.columns: pivot_gestion['No'] = 0
+                # 3. Fila de Total General (Para replicar la estructura de tabla dinámica de Excel)
+                total_q_gen = df_resumen_cloud['Total (Q)'].sum()
+                total_si_gen = df_resumen_cloud['✅ En Cloud (Q)'].sum()
+                total_no_gen = df_resumen_cloud['❌ Sin Cloud (Q)'].sum()
+                precision_gen = (total_si_gen / total_q_gen * 100.0) if total_q_gen > 0 else 0.0
                 
-                # Calcular Precisión
-                pivot_gestion['% Cloud'] = (pivot_gestion['Sí'] / pivot_gestion['TOTAL GENERAL']).fillna(0)
+                df_cv_all = df_cloud[df_cloud['Tipo_Gestión'] == 'CONTACTO VALIDO']
+                si_cv_all = len(df_cv_all[df_cv_all['Validación_Genesys'] == 'Sí'])
+                pct_cv_all = (si_cv_all / len(df_cv_all) * 100.0) if not df_cv_all.empty else None
                 
-                # Limpiar el nombre de la última fila de márgenes para estética
-                pivot_gestion.loc[pivot_gestion['Reprogramador'] == 'TOTAL GENERAL', 'Tipo_Gestión'] = '-'
+                df_cnv_all = df_cloud[df_cloud['Tipo_Gestión'] == 'CONTACTO NO VALIDO']
+                si_cnv_all = len(df_cnv_all[df_cnv_all['Validación_Genesys'] == 'Sí'])
+                pct_cnv_all = (si_cnv_all / len(df_cnv_all) * 100.0) if not df_cnv_all.empty else None
+
+                df_totales = pd.DataFrame([{
+                    'Analista': 'TOTAL GENERAL',
+                    'Total (Q)': total_q_gen,
+                    '✅ En Cloud (Q)': total_si_gen,
+                    '❌ Sin Cloud (Q)': total_no_gen,
+                    '🎯 Precisión Global': precision_gen,
+                    '📞 C. Válido (% Cloud)': pct_cv_all,
+                    '📵 C. No Válido (% Cloud)': pct_cnv_all
+                }])
+                
+                df_resumen_cloud = pd.concat([df_resumen_cloud, df_totales], ignore_index=True)
+
+                # 4. Renderizar la tabla con estilos personalizados
+                st.markdown("#### 📋 Matriz de Asertividad por Analista")
                 
                 st.dataframe(
-                    pivot_gestion,
+                    df_resumen_cloud,
                     column_config={
-                        "Reprogramador": st.column_config.TextColumn("Analista", width="medium"),
-                        "Tipo_Gestión": st.column_config.TextColumn("Tipo de Gestión", width="medium"),
-                        "Sí": st.column_config.NumberColumn("✅ En Cloud (Q)", format="%d"),
-                        "No": st.column_config.NumberColumn("❌ Sin Cloud (Q)", format="%d"),
-                        "TOTAL GENERAL": st.column_config.NumberColumn("Total (Q)", format="%d"),
-                        "% Cloud": st.column_config.ProgressColumn("Precisión", format="%.1f%%", min_value=0.0, max_value=1.0)
+                        "Analista": st.column_config.TextColumn("Analista", width="large"),
+                        "Total (Q)": st.column_config.NumberColumn("Total (Q)", format="%d"),
+                        "✅ En Cloud (Q)": st.column_config.NumberColumn("✅ En Cloud (Q)", format="%d"),
+                        "❌ Sin Cloud (Q)": st.column_config.NumberColumn("❌ Sin Cloud (Q)", format="%d"),
+                        "🎯 Precisión Global": st.column_config.ProgressColumn(
+                            "🎯 Precisión Global", 
+                            format="%.1f%%", 
+                            min_value=0.0, 
+                            max_value=100.0  # Corrección de escala
+                        ),
+                        "📞 C. Válido (% Cloud)": st.column_config.NumberColumn(
+                            "📞 C. Válido (% Cloud)", 
+                            format="%.1f%%"
+                        ),
+                        "📵 C. No Válido (% Cloud)": st.column_config.NumberColumn(
+                            "📵 C. No Válido (% Cloud)", 
+                            format="%.1f%%"
+                        )
                     },
                     hide_index=True,
                     use_container_width=True,
-                    height=400 
+                    height=450
                 )
             else:
                 st.info("No hay datos de Contacto Válido/No Válido para cruzar en el rango de fechas seleccionado.")
