@@ -972,12 +972,12 @@ with col_main:
                             "Cumplimiento Global (%)": st.column_config.NumberColumn(
                                 "Cumplimiento (%)",
                                 help="Tasa global de gestión efectiva",
-                                format="%.1f%%"
+                                format="%.0f%%"
                             ),
                             "% Desvío": st.column_config.ProgressColumn(
                                 "Error (%)",
                                 help="Tasa de incumplimiento telefónico / error tipificación",
-                                format="%.2f%%",
+                                format="%.0f%%",
                                 min_value=0.0,
                                 max_value=max(float(df_resumen_cloud["% Desvío"].max() or 5.0), 5.0)  # Escala inteligente al desvío real
                             )
