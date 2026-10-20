@@ -30,8 +30,9 @@ def extraer_datos(ruta_repro, ruta_quantia, ruta_genesys, ruta_reporte_bo):
 
     print("⏳ Extrayendo datos de REPORTE BO...")
     try:
-        df_reporte_bo = pd.read_csv(ruta_reporte_bo)
-    except Exception:
+        df_reporte_bo = pd.read_csv(ruta_reporte_bo, low_memory=False)
+    except Exception as e:
+        print(f"⚠️ Error al leer ReporteBO ({ruta_reporte_bo}): {e}")
         df_reporte_bo = pd.DataFrame()
     
     return dict_repro, dict_quantia, df_genesys, df_reporte_bo

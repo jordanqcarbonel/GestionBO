@@ -96,17 +96,17 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo):
 
     datos_procesados = []
 
-    # 1. PROCESAR HOJAS: APP, DIG, REPRO TLV
-    hojas_grupo_1 = ['APP', 'DIG', 'REPRO TLV']
+    # 1. PROCESAR HOJAS: APP, DIG, REPRO TLV, FONO
+    hojas_grupo_1 = ['APP', 'DIG', 'REPRO TLV', 'FONO']
     for hoja in hojas_grupo_1:
         if hoja in dict_repro:
             df = dict_repro[hoja]
             
             # Bloque de Gestiones Regulares (1, 2 y 3)
             mapeo_gestiones = [
-                {'FECHA DE GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 1': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden'},
-                {'FECHA DE GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 2': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden'},
-                {'FECHA DE GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 3': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden'}
+                {'FECHA DE GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 1': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden', 'Orden': 'Orden'},
+                {'FECHA DE GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 2': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden', 'Orden': 'Orden'},
+                {'FECHA DE GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR ASIGNADO 3': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'N° LLAMADA': 'Telefono', 'ORDEN': 'Orden', 'Orden': 'Orden'}
             ]
             df_gestiones = estandarizar_y_unir(df, mapeo_gestiones, hoja, 'GESTIÓN REPRO')
             
@@ -129,9 +129,9 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo):
         df = dict_repro['CAIDAS']
         # Como solo hay un reprogramador, lo asignamos a los 3 mapeos
         mapeo_caidas_unica = [
-            {'FECHA GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden'},
-            {'FECHA GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden'},
-            {'FECHA GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden'}
+            {'FECHA GESTIÓN 1': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 1': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden', 'ORDEN': 'Orden'},
+            {'FECHA GESTIÓN 2': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 2': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden', 'ORDEN': 'Orden'},
+            {'FECHA GESTIÓN 3': 'Fecha_Gestión', 'REPROGRAMADOR': 'Reprogramador', 'TIPO CONTACTO 3': 'Tipo_Gestión', 'NÚMERO DE LLAMADA': 'Telefono', 'Orden': 'Orden', 'ORDEN': 'Orden'}
         ]
         df_caidas_unica = estandarizar_y_unir(df, mapeo_caidas_unica, 'CAIDAS', 'GESTIÓN REPRO')
         datos_procesados.append(df_caidas_unica)
@@ -217,19 +217,24 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo):
     else:
         df_final['Validación_Genesys'] = 'No aplica'
 
-        # --- CRUCE: EFECTIVIDAD DE ENTREGAS (ÚLTIMO CONTACTO VÁLIDO) ---
+    # --- CRUCE: EFECTIVIDAD DE ENTREGAS (ÚLTIMO CONTACTO VÁLIDO) ---
     if not df_reporte_bo.empty and 'Orden' in df_final.columns:
-        # Estandarizar nombre de ordenes para que crucen perfecto
-        df_final['Orden'] = df_final['Orden'].astype(str).str.strip().str.upper()
-        df_reporte_bo['Orden'] = df_reporte_bo['Orden'].astype(str).str.strip().str.upper()
+        # Función auxiliar para normalizar número de orden (elimina .0 de flotantes, espacios y nulos)
+        def normalizar_orden(serie):
+            s = serie.astype(str).str.replace(r'\.0$', '', regex=True).str.strip().str.upper()
+            return s.replace({'NAN': None, 'NONE': None, 'NULL': None, '': None})
+
+        df_final['Orden'] = normalizar_orden(df_final['Orden'])
+        df_reporte_bo['Orden'] = normalizar_orden(df_reporte_bo['Orden'])
         
         # 1. Identificar el orden real de las gestiones usando el índice temporal
         hojas_repro = ['APP', 'FONO', 'DIG', 'REPRO TLV', 'CAIDAS']
         
-        # Filtrar el universo: Solo Contactos Válidos de las hojas requeridas
+        # Filtrar el universo: Solo Contactos Válidos de las hojas requeridas con orden válida
         df_validos = df_final[
             (df_final['Tipo_Gestión'] == 'CONTACTO VALIDO') & 
-            (df_final['Hoja_Origen'].isin(hojas_repro))
+            (df_final['Hoja_Origen'].isin(hojas_repro)) &
+            df_final['Orden'].notna()
         ].copy()
         
         # 2. Ordenar por Orden y por Index (que mantiene el orden natural de Gestión 1, 2, 3)
@@ -243,9 +248,13 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo):
         df_final['Es_Ultimo_Contacto'] = False
         df_final.loc[indices_ultimos, 'Es_Ultimo_Contacto'] = True
         
-        # 5. Cruzar con el Reporte BO
+        # 5. Cruzar con el Reporte BO (deduplicando previamente en caso de órdenes repetidas)
+        rep_cols = ['Orden', 'Estado_Entrega', 'Semana del Mes']
+        df_rep_dedup = df_reporte_bo[rep_cols].dropna(subset=['Orden']).drop_duplicates(subset=['Orden'])
+        
+        df_final.drop(columns=['Estado_Entrega', 'Semana del Mes'], inplace=True, errors='ignore')
         df_final = df_final.merge(
-            df_reporte_bo[['Orden', 'Estado_Entrega', 'Semana del Mes']],
+            df_rep_dedup,
             on='Orden',
             how='left'
         )
@@ -254,6 +263,7 @@ def transformar_datos(dict_repro, dict_quantia, df_genesys, df_reporte_bo):
         df_final.loc[~df_final['Es_Ultimo_Contacto'], 'Estado_Entrega'] = None
         df_final.loc[~df_final['Es_Ultimo_Contacto'], 'Semana del Mes'] = None
     else:
+        df_final['Es_Ultimo_Contacto'] = False
         df_final['Estado_Entrega'] = None
         df_final['Semana del Mes'] = None
     

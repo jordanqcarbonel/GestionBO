@@ -1003,6 +1003,45 @@ with col_main:
             df_entregas = df_filtrado.dropna(subset=['Estado_Entrega', 'Semana del Mes']).copy()
             
             if not df_entregas.empty:
+                # Métricas macro
+                n_total_entregas = len(df_entregas)
+                q_entregadas = len(df_entregas[df_entregas['Estado_Entrega'] == 'ENTREGAS'])
+                pct_entregadas = (q_entregadas / n_total_entregas * 100.0) if n_total_entregas > 0 else 0.0
+                q_no_entregadas = len(df_entregas[df_entregas['Estado_Entrega'] == 'NO ENTREGAS'])
+                pct_no_entregadas = (q_no_entregadas / n_total_entregas * 100.0) if n_total_entregas > 0 else 0.0
+                q_en_ruta = len(df_entregas[df_entregas['Estado_Entrega'] == 'EN RUTA'])
+                pct_en_ruta = (q_en_ruta / n_total_entregas * 100.0) if n_total_entregas > 0 else 0.0
+
+                col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+                with col_e1:
+                    st.metric(
+                        label="Órdenes Atribuidas",
+                        value=f"{n_total_entregas:,}".replace(",", ".")
+                    )
+                with col_e2:
+                    st.metric(
+                        label="Entregadas",
+                        value=f"{q_entregadas:,}".replace(",", "."),
+                        delta=f"{pct_entregadas:.1f}%"
+                    )
+                with col_e3:
+                    st.metric(
+                        label="No Entregadas",
+                        value=f"{q_no_entregadas:,}".replace(",", "."),
+                        delta=f"{pct_no_entregadas:.1f}%",
+                        delta_color="inverse"
+                    )
+                with col_e4:
+                    st.metric(
+                        label="En Ruta",
+                        value=f"{q_en_ruta:,}".replace(",", "."),
+                        delta=f"{pct_en_ruta:.1f}%",
+                        delta_color="off"
+                    )
+
+                st.markdown("<hr style='margin: 8px 0 14px 0; border: none; border-top: 1px solid #e2e8f0;'/>", unsafe_allow_html=True)
+                st.markdown("#### 📋 Matriz de Efectividad por Analista y Semana")
+
                 semanas = sorted(df_entregas['Semana del Mes'].unique())
                 estados_unicos = sorted(df_entregas['Estado_Entrega'].unique())
                 
@@ -1062,7 +1101,7 @@ with col_main:
                     height=500
                 )
             else:
-                st.info("No hay datos de entregas atribuidos a Contactos Válidos en este período.")
+                st.info("No hay datos de entregas atribuidos a Contactos Válidos en este período. Si estás consultando 'Hoy', verifica si la data del día ya cuenta con el cruce consolidado o selecciona un rango de fechas con gestiones.")
         else:
             st.warning("⚠️ La columna de entregas no existe. Verifica la extracción de ReporteBO.")
 
